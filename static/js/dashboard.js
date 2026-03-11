@@ -121,6 +121,44 @@
     window.removeRetailer = removeRetailer;
   }
 
+  function initLoadingState() {
+    const form = document.getElementById('dashboard-form');
+    const overlay = document.getElementById('loading-overlay');
+    const loadingText = document.getElementById('loading-text');
+    if (!form || !overlay || !loadingText) {
+      return;
+    }
+
+    const submitButtons = Array.from(form.querySelectorAll('button[type="submit"]'));
+    let lastSubmitAction = null;
+
+    submitButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        lastSubmitAction = button.value || null;
+      });
+    });
+
+    form.addEventListener('submit', (event) => {
+      const submitter = event.submitter || document.activeElement;
+      const action = submitter?.value || lastSubmitAction || 'load';
+      const message = action === 'compare' ? 'Comparing prices...' : 'Loading retailers...';
+      loadingText.textContent = message;
+      overlay.hidden = false;
+
+      submitButtons.forEach((button) => {
+        button.disabled = button !== submitter;
+      });
+    });
+
+    window.addEventListener('pageshow', () => {
+      overlay.hidden = true;
+      submitButtons.forEach((button) => {
+        button.disabled = false;
+      });
+    });
+  }
+
   initPriceChart();
   initRetailerControls();
+  initLoadingState();
 })();

@@ -43,17 +43,17 @@
               <button type="submit" name="action" value="load">Load Retailers</button>
             </div>
 
-            {% if product_preview.image_url or product_preview.title %}
-              <section class="product-preview fade-item">
-                {% if product_preview.image_url %}
-                  <img src="{{ product_preview.image_url }}" alt="{{ product_preview.title or 'Product image' }}" loading="lazy">
-                {% endif %}
-                <div>
-                  <div class="kicker">Loaded Product</div>
-                  <div class="product-title">{{ product_preview.title or ('Product ID ' ~ form_values.product_id) }}</div>
-                </div>
-              </section>
-            {% endif %}
+            <section class="product-preview fade-item">
+              {% if product_preview.image_url %}
+                <img src="{{ product_preview.image_url }}" alt="{{ product_preview.title or 'Product image' }}" loading="lazy">
+              {% else %}
+                <div class="product-image-placeholder" aria-hidden="true"></div>
+              {% endif %}
+              <div>
+                <div class="kicker">Loaded Product</div>
+                <div class="product-title">{{ product_preview.title or ('Product ID ' ~ form_values.product_id if form_values.product_id else 'No product loaded') }}</div>
+              </div>
+            </section>
 
             {% if shops %}
               <section class="retailers stack">
@@ -88,6 +88,25 @@
 
         <section class="dashboard-panel results-panel">
           <h2>Comparison Results</h2>
+          {% if cheaper_banner %}
+            <div class="cheaper-banner">
+              {{ cheaper_banner.cheaper_name }} is currently &pound;{{ "%.2f"|format(cheaper_banner.gap) }} ({{ "%.1f"|format(cheaper_banner.gap_pct) }}%) cheaper than {{ cheaper_banner.expensive_name }}.
+            </div>
+          {% endif %}
+          {% if market_snapshot and market_snapshot.market_low is not none %}
+            <div class="current-low-banner">
+              Current lowest price right now: &pound;{{ "%.2f"|format(market_snapshot.market_low) }}
+              {% if market_snapshot.market_low_shop %}at {{ market_snapshot.market_low_shop }}{% endif %}
+              {% if market_snapshot.offer_count is not none %}({{ market_snapshot.offer_count }} active listings){% endif %}.
+            </div>
+          {% endif %}
+          {% if lowest_range_price and chart_data %}
+            <div class="range-low-banner">
+              Lowest recorded price in {{ chart_data.range_label }}: &pound;{{ "%.2f"|format(lowest_range_price.price) }}
+              {% if lowest_range_price.shop_name %}at {{ lowest_range_price.shop_name }}{% endif %}
+              {% if lowest_range_price.date_display %}on {{ lowest_range_price.date_display }}{% endif %}.
+            </div>
+          {% endif %}
           {% if chart_data and chart_data.series %}
             <section class="chart-panel">
               <div class="chart-head">
@@ -108,9 +127,20 @@
                     <div class="error">{{ row.error }}</div>
                   {% else %}
                     <div class="kicker">Today / Latest</div>
-                    <div class="value">GBP {{ row.latest_price }}<br><small>{{ row.latest_date }}</small></div>
+                    <div class="value">GBP {{ row.latest_price }}<br><small>{{ row.latest_date_display }}</small></div>
+                    {% if row.change_pct is not none %}
+                      <div class="change-indicator change-{{ row.change_direction }}">
+                        {% if row.change_direction == 'down' %}
+                          &darr; {{ (row.change_pct|abs)|round(1) }}% vs 30 days ago
+                        {% elif row.change_direction == 'up' %}
+                          &uarr; {{ row.change_pct|round(1) }}% vs 30 days ago
+                        {% else %}
+                          &rarr; 0.0% vs 30 days ago
+                        {% endif %}
+                      </div>
+                    {% endif %}
                     <div class="kicker">30 Days Ago</div>
-                    <div class="value">GBP {{ row.price_30d }}<br><small>{{ row.date_30d }}</small></div>
+                    <div class="value">GBP {{ row.price_30d }}<br><small>{{ row.date_30d_display }}</small></div>
                   {% endif %}
                 </article>
               {% endfor %}

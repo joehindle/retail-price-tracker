@@ -1,6 +1,15 @@
 from flask import Flask, render_template, request
 
-from services.price_service import TIME_RANGE_CONFIG, build_price_chart_data, compare_shops, get_available_shops, get_product_preview
+from services.comparison_service import build_cheaper_banner, build_terminal_metrics, print_terminal_metrics
+from services.price_service import (
+    TIME_RANGE_CONFIG,
+    build_price_chart_data,
+    compare_shops,
+    get_available_shops,
+    get_market_snapshot,
+    get_lowest_price_in_range,
+    get_product_preview,
+)
 
 
 TIME_RANGE_OPTIONS = [(key, cfg["label"]) for key, cfg in TIME_RANGE_CONFIG.items()]
@@ -13,6 +22,9 @@ def create_app():
     def index():
         output = []
         chart_data = None
+        cheaper_banner = None
+        lowest_range_price = None
+        market_snapshot = None
         error = None
         shops = []
         product_preview = {"title": None, "image_url": None}
@@ -46,17 +58,31 @@ def create_app():
 
                 if action == 'compare':
                     unique_shop_ids = list(dict.fromkeys(selected_shop_ids))
-                    selected_pairs = []
-
-                    for shop_id in unique_shop_ids:
-                        if shop_id in shop_lookup:
-                            selected_pairs.append((shop_lookup[shop_id], int(shop_id)))
+                    selected_pairs = [
+                        (shop_lookup[shop_id], int(shop_id))
+                        for shop_id in unique_shop_ids
+                        if shop_id in shop_lookup
+                    ]
 
                     if not selected_pairs:
                         error = 'Select at least one retailer before comparing.'
                     else:
                         output = compare_shops(product_id, selected_pairs, time_range=api_time_range)
                         chart_data = build_price_chart_data(product_id, selected_pairs, range_key=range_key)
+                        all_shop_pairs = [(shop["name"], int(shop["id"])) for shop in shops]
+                        lowest_range_price = get_lowest_price_in_range(
+                            product_id,
+                            all_shop_pairs,
+                            time_range=api_time_range,
+                        )
+                        market_snapshot = get_market_snapshot(
+                            product_id,
+                            all_shop_pairs,
+                            time_range=api_time_range,
+                        )
+                        cheaper_banner = build_cheaper_banner(output)
+                        terminal_metrics = build_terminal_metrics(output, market_snapshot)
+                        print_terminal_metrics(terminal_metrics)
             except ValueError as exc:
                 error = str(exc) if str(exc) else 'Enter a valid numeric product ID.'
             except Exception as exc:
@@ -69,6 +95,9 @@ def create_app():
             'index.html',
             output=output,
             chart_data=chart_data,
+            cheaper_banner=cheaper_banner,
+            lowest_range_price=lowest_range_price,
+            market_snapshot=market_snapshot,
             error=error,
             form_values=form_values,
             shops=shops,

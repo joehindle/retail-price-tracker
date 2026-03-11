@@ -50,6 +50,18 @@ def parse_dt(date_str):
     return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
 
 
+def format_display_date(date_str):
+    return parse_dt(date_str).strftime("%d %b %Y")
+
+
+def _clean_product_title(raw_title):
+    if not raw_title:
+        return raw_title
+
+    first_segment = raw_title.split("|", 1)[0].strip()
+    return re.sub(r"^\s*find\s+", "", first_segment, flags=re.IGNORECASE).strip()
+
+
 def _extract_meta_content(page_html, attr_name, attr_value):
     escaped_name = re.escape(attr_name)
     escaped_value = re.escape(attr_value)
@@ -75,6 +87,7 @@ def get_product_preview(product_id):
         _extract_meta_content(page_html, "property", "og:title")
         or _extract_meta_content(page_html, "name", "twitter:title")
     )
+    title = _clean_product_title(title)
 
     if image_url and image_url.startswith("//"):
         image_url = f"https:{image_url}"
@@ -104,6 +117,100 @@ def get_shop_history(product_id, shop_id, time_range="ThreeMonths"):
     if not shop_history:
         return []
     return shop_history[0]["productHistory"]["historyItems"]
+
+
+def _normalize_shop_entries(shops):
+    shop_entries = shops.items() if isinstance(shops, dict) else shops
+    normalized = []
+    for shop_name, shop_id in shop_entries:
+        normalized.append((shop_name, int(shop_id)))
+    return normalized
+
+
+def _fetch_shop_histories(product_id, shops, time_range):
+    normalized_entries = _normalize_shop_entries(shops)
+    if not normalized_entries:
+        return {}, []
+
+    shop_lookup = {shop_id: shop_name for shop_name, shop_id in normalized_entries}
+    shop_ids = [shop_id for _, shop_id in normalized_entries]
+    product = execute_bff_product_query(
+        product_id=product_id,
+        query=SHOP_HISTORY_QUERY,
+        variables={"id": product_id, "timeRange": time_range, "shopIds": shop_ids},
+        operation_name="shopHistory",
+    )
+    return shop_lookup, product.get("shopHistory") or []
+
+
+def get_lowest_price_in_range(product_id, shops, time_range="ThreeMonths"):
+    if not shops:
+        return None
+
+    shop_lookup, shop_histories = _fetch_shop_histories(product_id, shops, time_range)
+    if not shop_histories:
+        return None
+
+    lowest = None
+    for shop_history in shop_histories:
+        shop_id = shop_history.get("shopId")
+        history_items = (shop_history.get("productHistory") or {}).get("historyItems") or []
+        for item in history_items:
+            price_num = _coerce_price(item.get("price"))
+            if price_num is None:
+                continue
+            if lowest is None or price_num < lowest["price"]:
+                date_value = item.get("date")
+                lowest = {
+                    "price": round(price_num, 2),
+                    "shop_name": item.get("shopName") or shop_lookup.get(shop_id) or "Unknown retailer",
+                    "date": date_value,
+                    "date_display": format_display_date(date_value) if date_value else None,
+                }
+
+    return lowest
+
+
+def get_market_snapshot(product_id, shops, time_range="ThreeMonths"):
+    if not shops:
+        return {"market_low": None, "market_low_shop": None, "offer_count": 0}
+
+    shop_lookup, shop_histories = _fetch_shop_histories(product_id, shops, time_range)
+    if not shop_histories:
+        return {"market_low": None, "market_low_shop": None, "offer_count": 0}
+
+    latest_rows = []
+    for shop_history in shop_histories:
+        shop_id = shop_history.get("shopId")
+        history_items = (shop_history.get("productHistory") or {}).get("historyItems") or []
+        if not history_items:
+            continue
+
+        latest_item = max(history_items, key=lambda item: parse_dt(item["date"]))
+        latest_price = _coerce_price(latest_item.get("price"))
+        if latest_price is None:
+            continue
+
+        latest_rows.append(
+            {
+                "shop_name": latest_item.get("shopName") or shop_lookup.get(shop_id) or "Unknown retailer",
+                "price": latest_price,
+                "active": bool(latest_item.get("active")),
+            }
+        )
+
+    if not latest_rows:
+        return {"market_low": None, "market_low_shop": None, "offer_count": 0}
+
+    active_rows = [row for row in latest_rows if row["active"]]
+    reference_rows = active_rows if active_rows else latest_rows
+    market_low_row = min(reference_rows, key=lambda row: row["price"])
+
+    return {
+        "market_low": round(market_low_row["price"], 2),
+        "market_low_shop": market_low_row["shop_name"],
+        "offer_count": len(active_rows),
+    }
 
 
 def _normalize_range_key(range_key):
@@ -223,13 +330,35 @@ def compare_shops(product_id, selected_shops, time_range="ThreeMonths"):
             continue
 
         latest_item, item_30d = get_latest_and_30d_price(items)
+        latest_price = _coerce_price(latest_item.get("price"))
+        price_30d = _coerce_price(item_30d.get("price"))
+        change_pct = None
+        if isinstance(latest_price, (int, float)) and isinstance(price_30d, (int, float)) and price_30d != 0:
+            change_pct = ((latest_price - price_30d) / price_30d) * 100.0
+
+        if isinstance(latest_price, (int, float)) and isinstance(price_30d, (int, float)):
+            if latest_price < price_30d:
+                change_direction = "down"
+            elif latest_price > price_30d:
+                change_direction = "up"
+            else:
+                change_direction = "flat"
+        else:
+            change_direction = "flat"
+
         results.append(
             {
                 "shop_name": shop_name,
                 "latest_price": latest_item["price"],
                 "latest_date": latest_item["date"],
+                "latest_date_display": format_display_date(latest_item["date"]),
                 "price_30d": item_30d["price"],
                 "date_30d": item_30d["date"],
+                "date_30d_display": format_display_date(item_30d["date"]),
+                "latest_price_num": latest_price,
+                "price_30d_num": price_30d,
+                "change_pct": round(change_pct, 1) if isinstance(change_pct, (int, float)) else None,
+                "change_direction": change_direction,
             }
         )
 
