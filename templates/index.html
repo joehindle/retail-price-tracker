@@ -30,6 +30,15 @@
               <input id="product_id" name="product_id" value="{{ form_values.product_id }}" placeholder="e.g. 11920424" required>
             </div>
 
+            <div>
+              <label for="time_range">Graph Range</label>
+              <select id="time_range" name="time_range">
+                {% for key, label in time_range_options %}
+                  <option value="{{ key }}" {% if form_values.time_range == key %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
             <div class="toolbar">
               <button type="submit" name="action" value="load">Load Retailers</button>
             </div>
@@ -79,6 +88,17 @@
 
         <section class="dashboard-panel results-panel">
           <h2>Comparison Results</h2>
+          {% if chart_data and chart_data.series %}
+            <section class="chart-panel">
+              <div class="chart-head">
+                <strong>Price Trend</strong>
+                <span>{{ chart_data.range_label }}</span>
+              </div>
+              <div class="chart-wrap">
+                <canvas id="price-history-chart" aria-label="Price comparison line chart"></canvas>
+              </div>
+            </section>
+          {% endif %}
           {% if output %}
             <div class="results-grid">
               {% for row in output %}
@@ -104,8 +124,9 @@
   </main>
 
   <script>
-    window.dashboardData = {{ {'shops': shops}|tojson }};
+    window.dashboardData = {{ {'shops': shops, 'chartData': chart_data}|tojson }};
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 </body>
 </html>
