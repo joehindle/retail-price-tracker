@@ -3,248 +3,109 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Retail Price Tracker</title>
-  <style>
-    :root {
-      --bg: #f7f4ef;
-      --card: #ffffff;
-      --text: #1f2937;
-      --muted: #6b7280;
-      --accent: #0f766e;
-      --accent-dark: #115e59;
-      --border: #d1d5db;
-      --error-bg: #fee2e2;
-      --error-text: #991b1b;
-    }
-
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-      color: var(--text);
-      background: radial-gradient(circle at top right, #dbeafe 0, transparent 45%), var(--bg);
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: 24px;
-    }
-
-    main {
-      width: min(760px, 100%);
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 24px;
-      box-shadow: 0 10px 24px rgba(17, 24, 39, 0.08);
-    }
-
-    h1 {
-      margin: 0 0 8px;
-      font-size: 1.8rem;
-    }
-
-    p {
-      margin: 0 0 20px;
-      color: var(--muted);
-    }
-
-    .grid {
-      display: grid;
-      gap: 12px;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .full { grid-column: 1 / -1; }
-
-    label {
-      display: block;
-      font-weight: 600;
-      margin-bottom: 6px;
-      font-size: 0.95rem;
-    }
-
-    input, select {
-      width: 100%;
-      padding: 10px 12px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      font-size: 0.95rem;
-    }
-
-    button {
-      margin-top: 14px;
-      background: var(--accent);
-      color: white;
-      border: 0;
-      border-radius: 10px;
-      padding: 11px 16px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    button:hover { background: var(--accent-dark); }
-    .button-row { display: flex; gap: 10px; flex-wrap: wrap; }
-    .button-row button { margin-top: 0; }
-    .secondary { background: #1f2937; }
-    .secondary:hover { background: #111827; }
-    .retailer-row {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 8px;
-      margin-bottom: 10px;
-      align-items: center;
-    }
-    .remove-btn {
-      background: #dc2626;
-      padding: 10px 12px;
-    }
-    .remove-btn:hover { background: #b91c1c; }
-
-    .error {
-      margin-top: 16px;
-      background: var(--error-bg);
-      color: var(--error-text);
-      border-radius: 10px;
-      padding: 10px 12px;
-      font-weight: 600;
-    }
-
-    .output {
-      margin-top: 18px;
-      border-top: 1px solid var(--border);
-      padding-top: 18px;
-    }
-
-    .result {
-      background: #f9fafb;
-      border: 1px solid #e5e7eb;
-      border-radius: 12px;
-      padding: 12px;
-      margin-bottom: 10px;
-    }
-
-    .result h3 {
-      margin: 0 0 8px;
-      font-size: 1.05rem;
-    }
-
-    .empty {
-      color: var(--muted);
-      font-style: italic;
-    }
-
-    @media (max-width: 680px) {
-      .grid { grid-template-columns: 1fr; }
-    }
-  </style>
+  <title>Retail Price Tracker Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
 </head>
 <body>
-  <main>
-    <h1>Retail Price Tracker</h1>
-    <p>Load retailers from a product ID, then add as many as you want to compare.</p>
+  <header class="admin-topbar">
+    <div class="topbar-inner">
+      <div class="app-title">Retail Price Tracker</div>
+      <div class="topbar-meta">Admin Dashboard</div>
+    </div>
+  </header>
 
-    <form method="post">
-      <div class="grid">
-        <div class="full">
-          <label for="product_id">Product ID</label>
-          <input id="product_id" name="product_id" value="{{ form_values.product_id }}" required>
-        </div>
-        <div class="full">
-          <div class="button-row">
-            <button type="submit" name="action" value="load">Load Retailers</button>
-          </div>
-        </div>
-      </div>
+  <main class="page-main">
+    <section class="page-intro">
+      <h1>Price Monitoring</h1>
+      <p>Load a product, choose retailers, and compare latest price vs 30-day baseline.</p>
+    </section>
 
-      {% if shops %}
-        <div class="output">
-          <label>Retailers</label>
-          <div id="retailer-container">
-            {% for selected_id in selected_shop_ids %}
-              <div class="retailer-row">
-                <select name="shop_ids">
-                  {% for shop in shops %}
-                    <option value="{{ shop.id }}" {% if selected_id == (shop.id|string) %}selected{% endif %}>
-                      {{ shop.name }}
-                    </option>
-                  {% endfor %}
-                </select>
-                <button class="remove-btn" type="button" onclick="removeRetailer(this)">X</button>
-              </div>
-            {% endfor %}
-          </div>
-          <div class="button-row">
-            <button class="secondary" type="button" id="add-retailer-btn">+</button>
-            <button type="submit" name="action" value="compare">Compare Prices</button>
-          </div>
-        </div>
-      {% endif %}
-    </form>
+    <section class="dashboard" aria-label="Price tracker dashboard">
+      <div class="dashboard-grid">
+        <section class="dashboard-panel controls-panel stack">
+          <h2>Controls</h2>
+          <form method="post" class="stack">
+            <div>
+              <label for="product_id">Product ID</label>
+              <input id="product_id" name="product_id" value="{{ form_values.product_id }}" placeholder="e.g. 11920424" required>
+            </div>
 
-    {% if error %}
-      <div class="error">{{ error }}</div>
-    {% endif %}
+            <div class="toolbar">
+              <button type="submit" name="action" value="load">Load Retailers</button>
+            </div>
 
-    <section class="output">
-      {% if output %}
-        {% for row in output %}
-          <article class="result">
-            <h3>{{ row.shop_name }}</h3>
-            {% if row.error %}
-              <div>{{ row.error }}</div>
-            {% else %}
-              <div>Today/latest: GBP {{ row.latest_price }} on {{ row.latest_date }}</div>
-              <div>30 days ago: GBP {{ row.price_30d }} on {{ row.date_30d }}</div>
+            {% if product_preview.image_url or product_preview.title %}
+              <section class="product-preview fade-item">
+                {% if product_preview.image_url %}
+                  <img src="{{ product_preview.image_url }}" alt="{{ product_preview.title or 'Product image' }}" loading="lazy">
+                {% endif %}
+                <div>
+                  <div class="kicker">Loaded Product</div>
+                  <div class="product-title">{{ product_preview.title or ('Product ID ' ~ form_values.product_id) }}</div>
+                </div>
+              </section>
             {% endif %}
-          </article>
-        {% endfor %}
-      {% else %}
-        <div class="empty">Output will appear here after you submit the form.</div>
-      {% endif %}
+
+            {% if shops %}
+              <section class="retailers stack">
+                <div>
+                  <label>Retailers To Compare</label>
+                  <div id="retailer-container">
+                    {% for selected_id in selected_shop_ids %}
+                      <div class="retailer-row fade-item" style="--item-index: {{ loop.index0 }};">
+                        <select name="shop_ids">
+                          {% for shop in shops %}
+                            <option value="{{ shop.id }}" {% if selected_id == (shop.id|string) %}selected{% endif %}>{{ shop.name }}</option>
+                          {% endfor %}
+                        </select>
+                        <button class="remove-btn" type="button" onclick="removeRetailer(this)" aria-label="Remove retailer">x</button>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+
+                <div class="toolbar">
+                  <button class="btn-alt" type="button" id="add-retailer-btn">+ Add Retailer</button>
+                  <button class="btn-compare" type="submit" name="action" value="compare">Compare</button>
+                </div>
+              </section>
+            {% endif %}
+
+            {% if error %}
+              <div class="error">{{ error }}</div>
+            {% endif %}
+          </form>
+        </section>
+
+        <section class="dashboard-panel results-panel">
+          <h2>Comparison Results</h2>
+          {% if output %}
+            <div class="results-grid">
+              {% for row in output %}
+                <article class="result-item" style="--item-index: {{ loop.index0 }};">
+                  <h3>{{ row.shop_name }}</h3>
+                  {% if row.error %}
+                    <div class="error">{{ row.error }}</div>
+                  {% else %}
+                    <div class="kicker">Today / Latest</div>
+                    <div class="value">GBP {{ row.latest_price }}<br><small>{{ row.latest_date }}</small></div>
+                    <div class="kicker">30 Days Ago</div>
+                    <div class="value">GBP {{ row.price_30d }}<br><small>{{ row.date_30d }}</small></div>
+                  {% endif %}
+                </article>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="placeholder">No comparison yet. Load retailers and run compare.</div>
+          {% endif %}
+        </section>
+      </div>
     </section>
   </main>
-  {% if shops %}
+
   <script>
-    const retailerContainer = document.getElementById('retailer-container');
-    const addBtn = document.getElementById('add-retailer-btn');
-    const shops = {{ shops|tojson }};
-
-    function createRetailerRow() {
-      const row = document.createElement('div');
-      row.className = 'retailer-row';
-
-      const select = document.createElement('select');
-      select.name = 'shop_ids';
-
-      shops.forEach((shop) => {
-        const option = document.createElement('option');
-        option.value = String(shop.id);
-        option.textContent = shop.name;
-        select.appendChild(option);
-      });
-
-      const removeBtn = document.createElement('button');
-      removeBtn.type = 'button';
-      removeBtn.className = 'remove-btn';
-      removeBtn.textContent = 'X';
-      removeBtn.onclick = function () { removeRetailer(removeBtn); };
-
-      row.appendChild(select);
-      row.appendChild(removeBtn);
-      return row;
-    }
-
-    function removeRetailer(button) {
-      if (retailerContainer.children.length > 1) {
-        button.closest('.retailer-row').remove();
-      }
-    }
-
-    addBtn.addEventListener('click', () => {
-      retailerContainer.appendChild(createRetailerRow());
-    });
+    window.dashboardData = {{ {'shops': shops}|tojson }};
   </script>
-  {% endif %}
+  <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 </body>
 </html>
