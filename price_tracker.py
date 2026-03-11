@@ -1,15 +1,17 @@
+from datetime import datetime, timedelta
+
 import requests
-from datetime import datetime, timedelta, UTC
+
+
+PRICE_SPY_BFF_URL = "https://pricespy.co.uk/_internal/bff"
 
 
 def parse_dt(date_str):
     return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
 
 
-def get_available_shops(product_id, time_range="ThreeMonths"):
-    url = "https://pricespy.co.uk/_internal/bff"
-
-    headers = {
+def _base_headers(product_id):
+    return {
         "accept": "*/*",
         "content-type": "application/json",
         "origin": "https://pricespy.co.uk",
@@ -17,6 +19,8 @@ def get_available_shops(product_id, time_range="ThreeMonths"):
         "user-agent": "Mozilla/5.0",
     }
 
+
+def get_available_shops(product_id, time_range="ThreeMonths"):
     payload = {
         "query": """
         query priceHistoryV2($id: Int!, $timeRange: TimeRange!) {
@@ -32,12 +36,12 @@ def get_available_shops(product_id, time_range="ThreeMonths"):
         """,
         "variables": {
             "id": product_id,
-            "timeRange": time_range
+            "timeRange": time_range,
         },
-        "operationName": "priceHistoryV2"
+        "operationName": "priceHistoryV2",
     }
 
-    res = requests.post(url, headers=headers, json=payload)
+    res = requests.post(PRICE_SPY_BFF_URL, headers=_base_headers(product_id), json=payload, timeout=20)
     res.raise_for_status()
     body = res.json()
 
@@ -47,39 +51,7 @@ def get_available_shops(product_id, time_range="ThreeMonths"):
     return body["data"]["product"]["historyV2"]["historyAllShops"]
 
 
-def choose_two_shops(product_id):
-    shops = get_available_shops(product_id)
-
-    print("\nAvailable retailers:")
-    for i, shop in enumerate(shops, start=1):
-        print(f"{i}. {shop['name']} (ID: {shop['id']})")
-
-    first = int(input("\nChoose first retailer number: "))
-    second = int(input("Choose second retailer number: "))
-
-    if first == second:
-        raise ValueError("Please choose two different retailers.")
-
-    selected_1 = shops[first - 1]
-    selected_2 = shops[second - 1]
-
-    return {
-        selected_1["name"]: selected_1["id"],
-        selected_2["name"]: selected_2["id"]
-    }
-
-
 def get_shop_history(product_id, shop_id, time_range="ThreeMonths"):
-    url = "https://pricespy.co.uk/_internal/bff"
-
-    headers = {
-        "accept": "*/*",
-        "content-type": "application/json",
-        "origin": "https://pricespy.co.uk",
-        "referer": f"https://pricespy.co.uk/product.php?p={product_id}#statistics",
-        "user-agent": "Mozilla/5.0",
-    }
-
     payload = {
         "query": """
         query shopHistory($id: Int!, $timeRange: TimeRange!, $shopIds: [Int!]!) {
@@ -103,12 +75,12 @@ def get_shop_history(product_id, shop_id, time_range="ThreeMonths"):
         "variables": {
             "id": product_id,
             "timeRange": time_range,
-            "shopIds": [shop_id]
+            "shopIds": [shop_id],
         },
-        "operationName": "shopHistory"
+        "operationName": "shopHistory",
     }
 
-    res = requests.post(url, headers=headers, json=payload)
+    res = requests.post(PRICE_SPY_BFF_URL, headers=_base_headers(product_id), json=payload, timeout=20)
     res.raise_for_status()
     body = res.json()
 
@@ -116,7 +88,6 @@ def get_shop_history(product_id, shop_id, time_range="ThreeMonths"):
         raise Exception(f"GraphQL errors: {body['errors']}")
 
     shop_history = body["data"]["product"]["shopHistory"]
-
     if not shop_history:
         return []
 
@@ -127,39 +98,42 @@ def get_latest_and_30d_price(items):
     if not items:
         return None, None
 
-    items = sorted(items, key=lambda x: parse_dt(x["date"]))
-
-    latest_item = items[-1]
+    sorted_items = sorted(items, key=lambda x: parse_dt(x["date"]))
+    latest_item = sorted_items[-1]
     latest_dt = parse_dt(latest_item["date"])
 
     target_dt = latest_dt - timedelta(days=30)
-
-    on_or_before_30d = [item for item in items if parse_dt(item["date"]) <= target_dt]
+    on_or_before_30d = [item for item in sorted_items if parse_dt(item["date"]) <= target_dt]
 
     if on_or_before_30d:
         item_30d = on_or_before_30d[-1]
     else:
-        item_30d = items[0]
+        item_30d = sorted_items[0]
 
     return latest_item, item_30d
 
 
-def compare_selected_shops(product_id):
-    selected_shops = choose_two_shops(product_id)
-
-    print("\nPrice comparison:")
-    for shop_name, shop_id in selected_shops.items():
+def compare_shops(product_id, selected_shops):
+    results = []
+    shop_entries = selected_shops.items() if isinstance(selected_shops, dict) else selected_shops
+    for shop_name, shop_id in shop_entries:
         items = get_shop_history(product_id, shop_id)
 
         if not items:
-            print(f"{shop_name}: no history found")
+            results.append({
+                "shop_name": shop_name,
+                "error": "No history found",
+            })
             continue
 
         latest_item, item_30d = get_latest_and_30d_price(items)
 
-        print(f"\n{shop_name}")
-        print(f"  Today/latest: £{latest_item['price']} on {latest_item['date']}")
-        print(f"  30 days ago:  £{item_30d['price']} on {item_30d['date']}")
+        results.append({
+            "shop_name": shop_name,
+            "latest_price": latest_item["price"],
+            "latest_date": latest_item["date"],
+            "price_30d": item_30d["price"],
+            "date_30d": item_30d["date"],
+        })
 
-
-compare_selected_shops(11920424)
+    return results
