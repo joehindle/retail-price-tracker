@@ -77,6 +77,22 @@ def _extract_meta_content(page_html, attr_name, attr_value):
     return None
 
 
+def _extract_product_title_from_html(page_html):
+    match = re.search(
+        r'<div[^>]*data-test=["\']ProductTitle["\'][^>]*>.*?<h1[^>]*>(.*?)</h1>',
+        page_html,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if not match:
+        return None
+
+    # Strip any nested tags/entities and normalize spacing.
+    raw_text = re.sub(r"<[^>]+>", "", match.group(1))
+    text = unescape(raw_text).strip()
+    text = re.sub(r"\s+", " ", text)
+    return text or None
+
+
 def get_product_preview(product_id):
     page_html = fetch_product_page_html(product_id)
     image_url = (
@@ -84,7 +100,8 @@ def get_product_preview(product_id):
         or _extract_meta_content(page_html, "name", "twitter:image")
     )
     title = (
-        _extract_meta_content(page_html, "property", "og:title")
+        _extract_product_title_from_html(page_html)
+        or _extract_meta_content(page_html, "property", "og:title")
         or _extract_meta_content(page_html, "name", "twitter:title")
     )
     title = _clean_product_title(title)
