@@ -38,7 +38,7 @@ Built to be demo-ready for:
    - Summary cards
    - Price trend chart
    - Per-retailer result cards
-   - AI Insights preview panel
+   - AI Insights panel
 
 ## Screenshots For Portfolio / Recruitment
 
@@ -112,14 +112,13 @@ retail-price-tracker/
 5. Frontend enhances UI:
    - Chart.js rendering
    - Dynamic retailer selectors
-   - AI insights preview message generation
+   - AI feedback request/response rendering
 
 ## Notes And Limitations
 
 - Data source is external and may change or intermittently fail.
 - No persistent database; all data is fetched live per request.
 - AI feedback depends on a valid `GEMINI_API_KEY`.
-- `LAST_UPDATED_LABEL` in `app.py` is static text and not auto-generated.
 - No automated test suite is included yet.
 
 ## Why This Is Useful In A Hiring Demo
@@ -135,7 +134,7 @@ retail-price-tracker/
 
 ## Suggested Next Improvements
 
-1. Add a real AI backend endpoint for insights.
+1. Add structured JSON validation for AI responses (decision + rationale fields).
 2. Add test coverage for `price_service.py`.
 3. Add retry/backoff and clearer upstream error handling.
-4. Replace static `LAST_UPDATED_LABEL` with a dynamic timestamp.
+4. Add a short-lived cache for repeated product/shop history calls.

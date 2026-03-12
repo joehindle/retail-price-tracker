@@ -1,7 +1,10 @@
 """Gemini integration for constrained Currys-focused AI feedback."""
 
+from __future__ import annotations
+
 import json
 import os
+from typing import Any
 
 import requests
 
@@ -15,7 +18,7 @@ SYSTEM_PROMPT = (
 )
 
 
-def _extract_text_from_choice(choice):
+def _extract_text_from_choice(choice: dict[str, Any]) -> str:
     parts = ((choice.get("content") or {}).get("parts")) or []
     if isinstance(parts, list):
         text_parts = [part.get("text", "") for part in parts if isinstance(part, dict)]
@@ -23,28 +26,28 @@ def _extract_text_from_choice(choice):
     return ""
 
 
-def _coerce_float(value):
+def _coerce_float(value: Any) -> float | None:
     try:
         return float(value)
     except (TypeError, ValueError):
         return None
 
 
-def _format_money(value):
+def _format_money(value: Any) -> str:
     numeric = _coerce_float(value)
     if numeric is None:
         return "N/A"
     return f"{numeric:.2f}"
 
 
-def _format_pct(value):
+def _format_pct(value: Any) -> str:
     numeric = _coerce_float(value)
     if numeric is None:
         return "N/A"
     return f"{numeric:.1f}%"
 
 
-def _find_row_by_name(rows, token):
+def _find_row_by_name(rows: list[dict[str, Any]], token: str) -> dict[str, Any] | None:
     token = token.lower()
     for row in rows:
         if row.get("error"):
@@ -54,19 +57,19 @@ def _find_row_by_name(rows, token):
     return None
 
 
-def _build_retailer_summary(rows):
-    lines = []
+def _build_retailer_summary(rows: list[dict[str, Any]]) -> str:
+    lines: list[str] = []
     for row in rows:
         if row.get("error"):
             continue
         shop_name = row.get("shop_name") or "Unknown retailer"
         latest_price = _format_money(row.get("latest_price_num", row.get("latest_price")))
         change_pct = _format_pct(row.get("change_pct"))
-        lines.append(f"- {shop_name}: £{latest_price} (30-day change: {change_pct})")
+        lines.append(f"- {shop_name}: GBP {latest_price} (30-day change: {change_pct})")
     return "\n".join(lines) if lines else "- No valid comparison retailers selected."
 
 
-def _build_currys_directive_prompt(payload):
+def _build_currys_directive_prompt(payload: dict[str, Any]) -> str:
     output_rows = payload.get("output") or []
     market_snapshot = payload.get("marketSnapshot") or {}
     product_name = payload.get("productTitle") or "Selected product"
@@ -92,15 +95,15 @@ Your job is to give a pricing recommendation specifically for Currys based on co
 
 Product: {product_name}
 
-Currys current price: £{currys_price}
-Currys price 30 days ago: £{currys_price_30d}
+Currys current price: GBP {currys_price}
+Currys price 30 days ago: GBP {currys_price_30d}
 Currys 30-day change: {currys_change_pct}
 
 Comparison retailers:
 {retailer_summary}
 
 Market context:
-- Market low across all selected retailers: £{market_low}
+- Market low across all selected retailers: GBP {market_low}
 - Total selected retailers stocking: {offer_count_display}
 
 Instructions:
@@ -112,7 +115,7 @@ Instructions:
 """.strip()
 
 
-def generate_ai_feedback(payload):
+def generate_ai_feedback(payload: dict[str, Any]) -> dict[str, str]:
     """Generate AI feedback text for the dashboard comparison."""
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
@@ -122,21 +125,8 @@ def generate_ai_feedback(payload):
     prompt_text = _build_currys_directive_prompt(payload)
 
     body = {
-        "system_instruction": {
-            "parts": [{"text": SYSTEM_PROMPT}],
-        },
-        "contents": [
-            {
-                "role": "user",
-                "parts": [
-                    {
-                        "text": (
-                            prompt_text
-                        ),
-                    }
-                ],
-            }
-        ],
+        "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+        "contents": [{"role": "user", "parts": [{"text": prompt_text}]}],
     }
 
     response = requests.post(

@@ -157,7 +157,7 @@
                     <div class="summary-value">&pound;{{ "%.2f"|format(market_snapshot.market_low) }}</div>
                     <div class="summary-detail">
                       {% if market_snapshot.market_low_shop %}{{ market_snapshot.market_low_shop }}{% endif %}
-                      {% if market_snapshot.offer_count is not none %} · {{ market_snapshot.offer_count }} active listings{% endif %}
+                      {% if market_snapshot.offer_count is not none %} &middot; {{ market_snapshot.offer_count }} active listings{% endif %}
                     </div>
                   </article>
                 {% endif %}
@@ -167,8 +167,8 @@
                     <div class="summary-value">&pound;{{ "%.2f"|format(lowest_range_price.price) }}</div>
                     <div class="summary-detail">
                       {{ chart_data.range_label }}
-                      {% if lowest_range_price.shop_name %} · {{ lowest_range_price.shop_name }}{% endif %}
-                      {% if lowest_range_price.date_display %} · {{ lowest_range_price.date_display }}{% endif %}
+                      {% if lowest_range_price.shop_name %} &middot; {{ lowest_range_price.shop_name }}{% endif %}
+                      {% if lowest_range_price.date_display %} &middot; {{ lowest_range_price.date_display }}{% endif %}
                     </div>
                   </article>
                 {% endif %}
