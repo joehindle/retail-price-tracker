@@ -1,7 +1,10 @@
 """Flask entrypoint for the retail price tracker dashboard."""
 
-from flask import Flask, render_template, request
+from datetime import datetime
 
+from flask import Flask, jsonify, render_template, request
+
+from services.ai_service import generate_ai_feedback
 from services.comparison_service import build_cheaper_banner, build_terminal_metrics, print_terminal_metrics
 from services.price_service import (
     TIME_RANGE_CONFIG,
@@ -13,7 +16,6 @@ from services.price_service import (
 
 TIME_RANGE_OPTIONS = [(key, cfg["label"]) for key, cfg in TIME_RANGE_CONFIG.items()]
 EMPTY_PRODUCT_PREVIEW = {"title": None, "image_url": None}
-LAST_UPDATED_LABEL = "12 Mar 2026, 14:32"
 DEMO_PRODUCTS = [
     {"id": "11920424", "label": "Garmin Venu 3"},
     {"id": "6219512", "label": "Sony WH-1000XM5"},
@@ -48,9 +50,26 @@ def create_app():
     """Create and configure the Flask app."""
     app = Flask(__name__)
 
+    @app.post('/api/ai-feedback')
+    def ai_feedback():
+        """Generate AI pricing feedback from current dashboard data."""
+        payload = request.get_json(silent=True) or {}
+        output_rows = payload.get("output") or []
+        if not output_rows:
+            return jsonify({"error": "Run a comparison first to generate AI feedback."}), 400
+
+        try:
+            result = generate_ai_feedback(payload)
+            return jsonify(result)
+        except RuntimeError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except Exception as exc:
+            return jsonify({"error": f"AI request failed: {exc}"}), 502
+
     @app.route('/', methods=['GET', 'POST'])
     def index():
         """Render the dashboard and handle product lookup/compare actions."""
+        last_updated_label = datetime.now().strftime("%d %b %Y, %H:%M")
         output = []
         chart_data = None
         cheaper_banner = None
@@ -60,7 +79,7 @@ def create_app():
         shops = []
         product_preview = EMPTY_PRODUCT_PREVIEW.copy()
         selected_shop_ids = []
-        form_values = {'product_id': '', 'time_range': '1m'}
+        form_values = {'product_id': '', 'time_range': '1m', 'loaded_product_id': ''}
         demo_product_options = list(DEMO_PRODUCTS)
 
         if request.method == 'POST':
@@ -68,6 +87,7 @@ def create_app():
             form_values = {
                 'product_id': request.form.get('product_id', '').strip(),
                 'time_range': request.form.get('time_range', '1m').strip(),
+                'loaded_product_id': request.form.get('loaded_product_id', '').strip(),
             }
             selected_shop_ids = request.form.getlist('shop_ids')
 
@@ -76,6 +96,7 @@ def create_app():
                     raise ValueError('Enter a valid numeric product ID.')
 
                 product_id = int(form_values['product_id'])
+                product_id_str = str(product_id)
                 range_key = form_values['time_range'] if form_values['time_range'] in TIME_RANGE_CONFIG else '1m'
                 form_values['time_range'] = range_key
 
@@ -84,35 +105,46 @@ def create_app():
                 except Exception:
                     product_preview = EMPTY_PRODUCT_PREVIEW.copy()
 
-                shops = get_available_shops(product_id)
-                if action == 'load' and not shops:
-                    error = 'No live retailer listings found for this product right now.'
-                shop_lookup = {str(shop['id']): shop['name'] for shop in shops}
+                product_changed = form_values['loaded_product_id'] != product_id_str
+                if action == 'compare' and product_changed:
+                    selected_shop_ids = []
+                    form_values['loaded_product_id'] = ''
+                    error = 'Product changed. Load retailers again before comparing.'
+                else:
+                    shops = get_available_shops(product_id)
+                    if action == 'load':
+                        if not shops:
+                            error = 'No live retailer listings found for this product right now.'
+                            form_values['loaded_product_id'] = ''
+                        else:
+                            form_values['loaded_product_id'] = product_id_str
 
-                if action == 'compare':
-                    unique_shop_ids = list(dict.fromkeys(selected_shop_ids))
-                    selected_pairs = [
-                        (shop_lookup[shop_id], int(shop_id))
-                        for shop_id in unique_shop_ids
-                        if shop_id in shop_lookup
-                    ]
+                    shop_lookup = {str(shop['id']): shop['name'] for shop in shops}
+                    if action == 'compare':
+                        unique_shop_ids = list(dict.fromkeys(selected_shop_ids))
+                        selected_pairs = [
+                            (shop_lookup[shop_id], int(shop_id))
+                            for shop_id in unique_shop_ids
+                            if shop_id in shop_lookup
+                        ]
 
-                    if not selected_pairs:
-                        error = 'Select at least one retailer before comparing.'
-                    else:
-                        comparison_view = prepare_comparison_view(
-                            product_id,
-                            selected_pairs,
-                            shops,
-                            range_key=range_key,
-                        )
-                        output = comparison_view["output"]
-                        chart_data = comparison_view["chart_data"]
-                        lowest_range_price = comparison_view["lowest_range_price"]
-                        market_snapshot = comparison_view["market_snapshot"]
-                        cheaper_banner = build_cheaper_banner(output)
-                        terminal_metrics = build_terminal_metrics(output, market_snapshot)
-                        print_terminal_metrics(terminal_metrics)
+                        if not selected_pairs:
+                            error = 'Select at least one retailer before comparing.'
+                        else:
+                            comparison_view = prepare_comparison_view(
+                                product_id,
+                                selected_pairs,
+                                shops,
+                                range_key=range_key,
+                            )
+                            output = comparison_view["output"]
+                            chart_data = comparison_view["chart_data"]
+                            lowest_range_price = comparison_view["lowest_range_price"]
+                            market_snapshot = comparison_view["market_snapshot"]
+                            cheaper_banner = build_cheaper_banner(output)
+                            terminal_metrics = build_terminal_metrics(output, market_snapshot)
+                            print_terminal_metrics(terminal_metrics)
+                            form_values['loaded_product_id'] = product_id_str
             except ValueError as exc:
                 error = str(exc) if str(exc) else 'Enter a valid numeric product ID.'
             except Exception as exc:
@@ -145,7 +177,7 @@ def create_app():
             time_range_options=TIME_RANGE_OPTIONS,
             demo_products=demo_product_options,
             watchlist_items=DEMO_WATCHLIST,
-            last_updated_label=LAST_UPDATED_LABEL,
+            last_updated_label=last_updated_label,
         )
 
     return app

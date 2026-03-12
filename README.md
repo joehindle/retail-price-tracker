@@ -22,7 +22,7 @@ Built to be demo-ready for:
   - 3 months
   - 6 months
   - 12 months
-- Includes an AI-insights UI panel (currently preview logic in frontend, not a real LLM backend).
+- Includes an AI-insights panel backed by Google Gemini.
 
 ## Demo In 60 Seconds
 
@@ -70,6 +70,9 @@ pip install flask requests
 ### Run
 
 ```bash
+set GEMINI_API_KEY=your_key_here
+# Optional:
+# set GEMINI_MODEL=gemini-2.5-flash
 python start.py
 ```
 
@@ -115,7 +118,7 @@ retail-price-tracker/
 
 - Data source is external and may change or intermittently fail.
 - No persistent database; all data is fetched live per request.
-- AI panel is currently a frontend preview, not a backend AI integration.
+- AI feedback depends on a valid `GEMINI_API_KEY`.
 - `LAST_UPDATED_LABEL` in `app.py` is static text and not auto-generated.
 - No automated test suite is included yet.
 
