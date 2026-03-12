@@ -18,7 +18,6 @@ Built to be demo-ready for:
   - Current market low and active listing count
   - Lowest recorded point in the chosen range
 - Draws a line chart of daily price points over:
-  - 1 month
   - 3 months
   - 6 months
   - 12 months

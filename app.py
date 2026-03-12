@@ -15,7 +15,7 @@ from services.price_service import (
 )
 
 
-DEFAULT_RANGE_KEY = "1m"
+DEFAULT_RANGE_KEY = "3m"
 TIME_RANGE_OPTIONS = [(key, cfg["label"]) for key, cfg in TIME_RANGE_CONFIG.items()]
 EMPTY_PRODUCT_PREVIEW = {"title": None, "image_url": None}
 DEFAULT_FORM_VALUES = {"product_id": "", "time_range": DEFAULT_RANGE_KEY, "loaded_product_id": ""}

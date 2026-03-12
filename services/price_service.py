@@ -55,7 +55,6 @@ query shopHistory($id: Int!, $timeRange: TimeRange!, $shopIds: [Int!]!) {
 """
 
 TIME_RANGE_CONFIG = {
-    "1m": {"label": "1 Month", "api": "OneMonth", "days": 30},
     "3m": {"label": "3 Months", "api": "ThreeMonths", "days": 90},
     "6m": {"label": "6 Months", "api": "SixMonths", "days": 180},
     "12m": {"label": "12 Months", "api": "OneYear", "days": 365},
@@ -339,7 +338,7 @@ def get_market_snapshot(product_id, shops, time_range="ThreeMonths", shop_histor
 
 def _normalize_range_key(range_key):
     """Guard against invalid range keys coming from the request."""
-    return range_key if range_key in TIME_RANGE_CONFIG else "1m"
+    return range_key if range_key in TIME_RANGE_CONFIG else "3m"
 
 
 def _coerce_price(value):
@@ -409,7 +408,7 @@ def _build_daily_points(items_with_dates, start_date, end_date, anchor_price=Non
 def build_price_chart_data(
     product_id,
     selected_shops,
-    range_key="1m",
+    range_key="3m",
     shop_histories=None,
     anchor_histories=None,
 ):
@@ -531,7 +530,7 @@ def compare_shops(product_id, selected_shops, time_range="ThreeMonths", shop_his
     return results
 
 
-def prepare_comparison_view(product_id, selected_shops, all_shops, range_key="1m"):
+def prepare_comparison_view(product_id, selected_shops, all_shops, range_key="3m"):
     """Build all data needed by the compare view in one place."""
     normalized_key = _normalize_range_key(range_key)
     api_time_range = TIME_RANGE_CONFIG[normalized_key]["api"]
