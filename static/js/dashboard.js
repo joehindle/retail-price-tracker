@@ -3,6 +3,9 @@
   const appData = window.dashboardData || {};
   const shops = Array.isArray(appData.shops) ? appData.shops : [];
   const chartData = appData.chartData || null;
+  const outputRows = Array.isArray(appData.output) ? appData.output : [];
+  const marketSnapshot = appData.marketSnapshot || null;
+  const lowestRangePrice = appData.lowestRangePrice || null;
 
   function initPriceChart() {
     // Skip chart boot if the page has no chart data yet.
@@ -129,6 +132,69 @@
     window.removeRetailer = removeRetailer;
   }
 
+  function initAiPreview() {
+    // This is a UI-only preview until the real AI backend is connected.
+    const trigger = document.getElementById('generate-ai-feedback-btn');
+    const thread = document.getElementById('ai-thread');
+
+    if (!trigger || !thread) {
+      return;
+    }
+
+    function buildPreviewMessage() {
+      const pricedRows = outputRows.filter((row) => typeof row.latest_price_num === 'number');
+      const cheapestRow = pricedRows.reduce((lowest, row) => {
+        if (!lowest || row.latest_price_num < lowest.latest_price_num) {
+          return row;
+        }
+        return lowest;
+      }, null);
+      const steepestRow = pricedRows.reduce((winner, row) => {
+        if (typeof row.change_pct !== 'number') {
+          return winner;
+        }
+        if (!winner || Math.abs(row.change_pct) > Math.abs(winner.change_pct)) {
+          return row;
+        }
+        return winner;
+      }, null);
+
+      const lines = [];
+      if (cheapestRow) {
+        lines.push(`${cheapestRow.shop_name} is the cheapest retailer in the current selection at GBP ${cheapestRow.latest_price}.`);
+      }
+      if (lowestRangePrice && lowestRangePrice.price != null && chartData && chartData.range_label) {
+        lines.push(`The lowest point in the ${chartData.range_label} view was GBP ${lowestRangePrice.price.toFixed(2)}${lowestRangePrice.shop_name ? ` at ${lowestRangePrice.shop_name}` : ''}.`);
+      }
+      if (steepestRow) {
+        lines.push(`${steepestRow.shop_name} shows the strongest change versus the 30-day baseline at ${Math.abs(steepestRow.change_pct).toFixed(1)}%.`);
+      }
+      if (marketSnapshot && marketSnapshot.offer_count != null) {
+        lines.push(`Market context: ${marketSnapshot.offer_count} active listings are in the current snapshot.`);
+      }
+
+      return lines.join(' ');
+    }
+
+    trigger.addEventListener('click', () => {
+      const message = document.createElement('article');
+      const avatar = document.createElement('div');
+      const bubble = document.createElement('div');
+
+      thread.replaceChildren();
+      message.className = 'ai-message ai-message-assistant';
+      avatar.className = 'ai-avatar';
+      avatar.textContent = 'AI';
+      bubble.className = 'ai-bubble';
+      bubble.textContent = buildPreviewMessage() || 'AI feedback will appear here once the summary prompt is connected.';
+
+      message.appendChild(avatar);
+      message.appendChild(bubble);
+      thread.appendChild(message);
+    });
+  }
+
   initPriceChart();
   initRetailerControls();
+  initAiPreview();
 })();

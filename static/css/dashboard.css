@@ -254,6 +254,83 @@ button:hover { filter: brightness(0.95); }
   margin-bottom: 12px;
 }
 
+.ai-panel {
+  margin-bottom: 12px;
+  border: 1px solid #d9d4ef;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at top right, rgba(90, 39, 190, 0.12), transparent 34%),
+    linear-gradient(180deg, #fbf9ff, #f5f1ff);
+  padding: 14px;
+}
+
+.ai-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ai-panel-head h3 {
+  margin: 2px 0 0;
+  font-size: 1rem;
+}
+
+.ai-panel-copy {
+  margin: 10px 0 12px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.btn-ai {
+  white-space: nowrap;
+  background: linear-gradient(135deg, var(--accent), var(--magenta));
+  box-shadow: 0 10px 24px rgba(71, 36, 156, 0.18);
+}
+
+.ai-thread {
+  display: grid;
+  gap: 10px;
+}
+
+.ai-message {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.ai-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--magenta));
+}
+
+.ai-bubble {
+  border: 1px solid rgba(90, 39, 190, 0.14);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 12px 13px;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  box-shadow: 0 8px 18px rgba(34, 26, 73, 0.05);
+}
+
+.ai-message-system .ai-avatar {
+  background: #d9d4ef;
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(71, 36, 156, 0.12);
+}
+
 .chart-head {
   display: flex;
   justify-content: space-between;
@@ -370,6 +447,10 @@ button:hover { filter: brightness(0.95); }
     border-right: 0;
     border-bottom: 1px solid var(--border);
   }
+
+  .ai-panel-head {
+    flex-direction: column;
+  }
 }
 
 @media (max-width: 620px) {
@@ -384,5 +465,13 @@ button:hover { filter: brightness(0.95); }
   .product-preview img {
     width: 100%;
     height: 150px;
+  }
+
+  .btn-ai {
+    width: 100%;
+  }
+
+  .ai-message {
+    grid-template-columns: 1fr;
   }
 }

@@ -124,6 +124,31 @@
             </section>
           {% endif %}
           {% if output %}
+            <!-- AI feedback sits directly under the chart so users can read both together. -->
+            <section class="ai-panel" aria-labelledby="ai-insights-title">
+              <div class="ai-panel-head">
+                <div>
+                  <div class="kicker">Assistant</div>
+                  <h3 id="ai-insights-title">AI Insights</h3>
+                </div>
+                <button class="btn-ai" type="button" id="generate-ai-feedback-btn">
+                  Generate AI Feedback
+                </button>
+              </div>
+              <p class="ai-panel-copy">
+                Ask the assistant to explain the latest movement, the lowest point in range, and which retailers stand out.
+              </p>
+              <div class="ai-thread" id="ai-thread">
+                <article class="ai-message ai-message-system" id="ai-empty-state">
+                  <div class="ai-avatar">AI</div>
+                  <div class="ai-bubble">
+                    No AI feedback yet. Generate insights for the current comparison.
+                  </div>
+                </article>
+              </div>
+            </section>
+          {% endif %}
+          {% if output %}
             <!-- Each card shows the latest price and the chosen baseline comparison. -->
             <div class="results-grid">
               {% for row in output %}
@@ -160,7 +185,13 @@
   </main>
 
   <script>
-    window.dashboardData = {{ {'shops': shops, 'chartData': chart_data}|tojson }};
+    window.dashboardData = {{ {
+      'shops': shops,
+      'chartData': chart_data,
+      'output': output,
+      'marketSnapshot': market_snapshot,
+      'lowestRangePrice': lowest_range_price
+    }|tojson }};
   </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
