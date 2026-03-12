@@ -31,6 +31,7 @@
     <section class="page-intro">
       <h1>Price Monitoring</h1>
       <p>Load a product, choose retailers, and compare latest price vs 30-day baseline.</p>
+      <div class="page-meta">Last updated: {{ last_updated_label }}</div>
     </section>
 
     <section class="dashboard" aria-label="Price tracker dashboard">
@@ -40,8 +41,13 @@
           <form method="post" class="stack">
             <!-- Product lookup fields -->
             <div>
-              <label for="product_id">Product ID</label>
-              <input id="product_id" name="product_id" value="{{ form_values.product_id }}" placeholder="e.g. 11920424" required>
+              <label for="product_id">Product</label>
+              <select id="product_id" name="product_id" required>
+                <option value="" disabled {% if not form_values.product_id %}selected{% endif %}>Select a demo product</option>
+                {% for product in demo_products %}
+                  <option value="{{ product.id }}" {% if form_values.product_id == product.id %}selected{% endif %}>{{ product.label }}</option>
+                {% endfor %}
+              </select>
             </div>
 
             <div>
@@ -65,7 +71,28 @@
               {% endif %}
               <div>
                 <div class="kicker">Loaded Product</div>
-                <div class="product-title">{{ product_preview.title or ('Product ID ' ~ form_values.product_id if form_values.product_id else 'No product loaded') }}</div>
+                <div class="product-title">{{ product_preview.title or ('Selected demo product' if form_values.product_id else 'No product loaded') }}</div>
+              </div>
+            </section>
+
+            <section class="watchlist-panel">
+              <div class="watchlist-head">
+                <div>
+                  <div class="kicker">Workspace</div>
+                  <h3>Watchlist</h3>
+                </div>
+                <span class="watchlist-count">{{ watchlist_items|length }}</span>
+              </div>
+              <div class="watchlist-list">
+                {% for item in watchlist_items %}
+                  <article class="watchlist-item {% if form_values.product_id == item.id %}watchlist-item-active{% endif %}">
+                    <div class="watchlist-row">
+                      <div class="watchlist-name">{{ item.name }}</div>
+                      <span class="watchlist-trend watchlist-trend-{{ item.tone }}">{{ item.status }}</span>
+                    </div>
+                    <div class="watchlist-meta">{{ item.meta }}</div>
+                  </article>
+                {% endfor %}
               </div>
             </section>
 

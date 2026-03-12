@@ -13,6 +13,35 @@ from services.price_service import (
 
 TIME_RANGE_OPTIONS = [(key, cfg["label"]) for key, cfg in TIME_RANGE_CONFIG.items()]
 EMPTY_PRODUCT_PREVIEW = {"title": None, "image_url": None}
+LAST_UPDATED_LABEL = "12 Mar 2026, 14:32"
+DEMO_PRODUCTS = [
+    {"id": "11920424", "label": "Garmin Venu 3"},
+    {"id": "6219512", "label": "Sony WH-1000XM5"},
+    {"id": "16249682", "label": "Apple iPad Air 11-inch"},
+]
+DEMO_WATCHLIST = [
+    {
+        "id": "11920424",
+        "name": "Garmin Venu 3",
+        "meta": "Watching Amazon + Currys",
+        "status": "Promotion candidate",
+        "tone": "up",
+    },
+    {
+        "id": "12512012",
+        "name": "Sony WH-1000XM5",
+        "meta": "Price down 4.2% this week",
+        "status": "Strong demand holding",
+        "tone": "down",
+    },
+    {
+        "id": "12195811",
+        "name": "Nintendo Switch OLED",
+        "meta": "Waiting for retailer movement",
+        "status": "Stable across 3 listings",
+        "tone": "flat",
+    },
+]
 
 
 def create_app():
@@ -32,6 +61,7 @@ def create_app():
         product_preview = EMPTY_PRODUCT_PREVIEW.copy()
         selected_shop_ids = []
         form_values = {'product_id': '', 'time_range': '1m'}
+        demo_product_options = list(DEMO_PRODUCTS)
 
         if request.method == 'POST':
             action = request.form.get('action', 'load')
@@ -88,6 +118,15 @@ def create_app():
             except Exception as exc:
                 error = str(exc)
 
+        known_product_ids = {product["id"] for product in DEMO_PRODUCTS}
+        if form_values["product_id"] and form_values["product_id"] not in known_product_ids:
+            demo_product_options.append(
+                {
+                    "id": form_values["product_id"],
+                    "label": f"Custom Product ({form_values['product_id']})",
+                }
+            )
+
         if not selected_shop_ids and shops:
             selected_shop_ids = [str(shops[0]['id'])]
 
@@ -104,6 +143,9 @@ def create_app():
             product_preview=product_preview,
             selected_shop_ids=selected_shop_ids,
             time_range_options=TIME_RANGE_OPTIONS,
+            demo_products=demo_product_options,
+            watchlist_items=DEMO_WATCHLIST,
+            last_updated_label=LAST_UPDATED_LABEL,
         )
 
     return app

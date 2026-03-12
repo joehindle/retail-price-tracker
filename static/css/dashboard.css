@@ -129,6 +129,14 @@ body {
   font-size: 0.92rem;
 }
 
+.page-meta {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
 .dashboard {
   margin-top: 16px;
   border: 1px solid var(--border);
@@ -235,6 +243,101 @@ button:hover { filter: brightness(0.95); }
   font-size: 0.92rem;
   font-weight: 700;
   line-height: 1.3;
+}
+
+.watchlist-panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: linear-gradient(180deg, #fff, #f7f5ff);
+}
+
+.watchlist-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.watchlist-head h3 {
+  margin: 2px 0 0;
+  font-size: 1rem;
+}
+
+.watchlist-count {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  background: #ede9fe;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.watchlist-list {
+  display: grid;
+  gap: 8px;
+}
+
+.watchlist-item {
+  border: 1px solid #e5e1f3;
+  border-radius: 12px;
+  padding: 10px 11px;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.watchlist-item-active {
+  border-color: rgba(71, 36, 156, 0.28);
+  box-shadow: 0 0 0 2px rgba(71, 36, 156, 0.08);
+  background: linear-gradient(180deg, #ffffff, #f3efff);
+}
+
+.watchlist-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.watchlist-name {
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.watchlist-meta {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.watchlist-trend {
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.watchlist-trend-up {
+  background: #fdf2f8;
+  color: #be185d;
+}
+
+.watchlist-trend-down {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.watchlist-trend-flat {
+  background: #eef2ff;
+  color: #4338ca;
 }
 
 .retailers {
@@ -591,6 +694,10 @@ button:hover { filter: brightness(0.95); }
   .topbar-meta {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .watchlist-row {
+    flex-direction: column;
   }
 
   .product-preview { grid-template-columns: 1fr; }
