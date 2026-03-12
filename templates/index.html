@@ -10,7 +10,19 @@
   <header class="admin-topbar">
     <div class="topbar-inner">
       <div class="app-title">Retail Price Tracker</div>
-      <div class="topbar-meta">Admin Dashboard</div>
+      <div class="topbar-meta">
+        <a class="topbar-link" href="#">
+          Alerts
+          <span class="alert-badge">3</span>
+        </a>
+        <div class="topbar-user">
+          <div class="topbar-user-copy">
+            <div class="topbar-user-name">Joe Hindle</div>
+            <div class="topbar-user-role">Pricing Analyst</div>
+          </div>
+          <div class="topbar-avatar" aria-hidden="true">JH</div>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -153,7 +165,10 @@
               <div class="ai-panel-head">
                 <div>
                   <div class="kicker">Assistant</div>
-                  <h3 id="ai-insights-title">AI Insights</h3>
+                  <div class="ai-title-row">
+                    <h3 id="ai-insights-title">AI Insights</h3>
+                    <span class="recommendation-pill recommendation-pill-promote">Promote</span>
+                  </div>
                 </div>
                 <button class="btn-ai" type="button" id="generate-ai-feedback-btn">
                   Generate AI Feedback

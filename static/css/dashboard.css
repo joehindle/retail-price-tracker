@@ -45,9 +45,71 @@ body {
 }
 
 .topbar-meta {
+  display: flex;
+  align-items: center;
+  gap: 18px;
   color: var(--muted);
   font-size: 0.86rem;
   font-weight: 600;
+}
+
+.topbar-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.alert-badge {
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  padding: 0 6px;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.topbar-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar-user-copy {
+  text-align: right;
+}
+
+.topbar-user-name {
+  color: var(--text);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.topbar-user-role {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.topbar-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  color: #fff;
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-alt));
+  box-shadow: 0 10px 20px rgba(71, 36, 156, 0.18);
 }
 
 .page-main {
@@ -308,6 +370,30 @@ button:hover { filter: brightness(0.95); }
   font-size: 1rem;
 }
 
+.ai-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.recommendation-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.recommendation-pill-promote {
+  border: 1px solid #fbcfe8;
+  background: #fdf2f8;
+  color: #be185d;
+}
+
 .ai-panel-copy {
   margin: 10px 0 12px;
   color: var(--muted);
@@ -494,6 +580,17 @@ button:hover { filter: brightness(0.95); }
   .page-main {
     padding-left: 14px;
     padding-right: 14px;
+  }
+
+  .topbar-inner {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .topbar-meta {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .product-preview { grid-template-columns: 1fr; }
