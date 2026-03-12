@@ -30,7 +30,7 @@ Built to be demo-ready for:
 3. Pick a demo product from the dropdown:
    - `11920424` (Garmin Venu 3)
    - `6219512` (Sony WH-1000XM5)
-   - `16249682` (Apple iPad Air 11-inch)
+   - `13549231` (Beats Solo 4)
 4. Click `Load Retailers`.
 5. Add/remove retailers and click `Compare`.
 6. Review:

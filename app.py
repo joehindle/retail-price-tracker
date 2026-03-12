@@ -22,7 +22,7 @@ DEFAULT_FORM_VALUES = {"product_id": "", "time_range": DEFAULT_RANGE_KEY, "loade
 DEMO_PRODUCTS = [
     {"id": "11920424", "label": "Garmin Venu 3"},
     {"id": "6219512", "label": "Sony WH-1000XM5"},
-    {"id": "16249682", "label": "Apple iPad Air 11-inch"},
+    {"id": "13549231", "label": "Beats Solo 4 Wireless On-ear Headphones"},
 ]
 DEMO_WATCHLIST = [
     {
