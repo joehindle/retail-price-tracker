@@ -53,7 +53,9 @@ def create_app():
                 except Exception:
                     product_preview = {"title": None, "image_url": None}
 
-                shops = get_available_shops(product_id, time_range=api_time_range)
+                shops = get_available_shops(product_id)
+                if action == 'load' and not shops:
+                    error = 'No live retailer listings found for this product right now.'
                 shop_lookup = {str(shop['id']): shop['name'] for shop in shops}
 
                 if action == 'compare':

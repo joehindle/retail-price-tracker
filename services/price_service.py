@@ -5,11 +5,24 @@ import re
 from services.pricespy_client import execute_bff_product_query, fetch_product_page_html
 
 
-PRICE_HISTORY_QUERY = """
-query priceHistoryV2($id: Int!, $timeRange: TimeRange!) {
+PRODUCT_LISTINGS_QUERY = """
+query productListings($id: Int!) {
   product(id: $id) {
-    historyV2(timeRange: $timeRange) {
-      historyAllShops {
+    listings {
+      store {
+        id
+        name
+      }
+    }
+  }
+}
+"""
+
+PRODUCT_OFFERS_QUERY = """
+query productOffers($id: Int!) {
+  product(id: $id) {
+    offers {
+      store {
         id
         name
       }
@@ -112,14 +125,76 @@ def get_product_preview(product_id):
     return {"title": title, "image_url": image_url}
 
 
-def get_available_shops(product_id, time_range="ThreeMonths"):
-    product = execute_bff_product_query(
-        product_id=product_id,
-        query=PRICE_HISTORY_QUERY,
-        variables={"id": product_id, "timeRange": time_range},
-        operation_name="priceHistoryV2",
-    )
-    return product["historyV2"]["historyAllShops"]
+def get_available_shops(product_id):
+    return _get_listing_shops(product_id)
+
+
+def _collect_unique_shops_from_store_items(items):
+    unique = {}
+    for item in items or []:
+        store = item.get("store") or {}
+        store_id = store.get("id")
+        store_name = store.get("name")
+        if not isinstance(store_id, int) or not store_name:
+            continue
+        unique[store_id] = {"id": store_id, "name": store_name}
+    return list(unique.values())
+
+
+def _get_listing_shops(product_id):
+    listing_queries = [
+        (PRODUCT_LISTINGS_QUERY, "productListings", "listings"),
+        (PRODUCT_OFFERS_QUERY, "productOffers", "offers"),
+    ]
+
+    for query, operation_name, collection_key in listing_queries:
+        try:
+            product = execute_bff_product_query(
+                product_id=product_id,
+                query=query,
+                variables={"id": product_id},
+                operation_name=operation_name,
+            )
+            shops = _collect_unique_shops_from_store_items(product.get(collection_key))
+            if shops:
+                shops.sort(key=lambda shop: shop["name"].lower())
+                return shops
+        except Exception:
+            continue
+
+    # Fallback to parsing listing store data from page payload (still listing-only).
+    try:
+        page_html = fetch_product_page_html(product_id)
+        stores = _extract_stores_from_page_html(page_html)
+        if stores:
+            stores.sort(key=lambda shop: shop["name"].lower())
+            return stores
+    except Exception:
+        pass
+
+    return []
+
+
+def _extract_stores_from_page_html(page_html):
+    if not page_html:
+        return []
+
+    # Capture common serialized listing shape: ..."store":{"id":123,"name":"Retailer"...
+    patterns = [
+        r'"store"\s*:\s*\{\s*"id"\s*:\s*(\d+)\s*,\s*"name"\s*:\s*"([^"]+)"',
+        r'"store"\s*:\s*\{.*?"id"\s*:\s*(\d+).*?"name"\s*:\s*"([^"]+)"',
+    ]
+    unique = {}
+    for pattern in patterns:
+        for match in re.finditer(pattern, page_html, flags=re.IGNORECASE | re.DOTALL):
+            store_id = int(match.group(1))
+            store_name = unescape(match.group(2)).strip()
+            if store_name:
+                unique[store_id] = {"id": store_id, "name": store_name}
+        if unique:
+            break
+
+    return list(unique.values())
 
 
 def get_shop_history(product_id, shop_id, time_range="ThreeMonths"):
@@ -241,6 +316,12 @@ def _coerce_price(value):
         return None
 
 
+def _compute_change_pct(current_price, baseline_price):
+    if isinstance(current_price, (int, float)) and isinstance(baseline_price, (int, float)) and baseline_price != 0:
+        return ((current_price - baseline_price) / baseline_price) * 100.0
+    return None
+
+
 def _window_dates(days):
     end_date = datetime.now(UTC).date()
     start_date = end_date - timedelta(days=days - 1)
@@ -349,9 +430,7 @@ def compare_shops(product_id, selected_shops, time_range="ThreeMonths"):
         latest_item, item_30d = get_latest_and_30d_price(items)
         latest_price = _coerce_price(latest_item.get("price"))
         price_30d = _coerce_price(item_30d.get("price"))
-        change_pct = None
-        if isinstance(latest_price, (int, float)) and isinstance(price_30d, (int, float)) and price_30d != 0:
-            change_pct = ((latest_price - price_30d) / price_30d) * 100.0
+        change_pct = _compute_change_pct(latest_price, price_30d)
 
         if isinstance(latest_price, (int, float)) and isinstance(price_30d, (int, float)):
             if latest_price < price_30d:
