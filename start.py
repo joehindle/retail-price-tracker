@@ -1,3 +1,5 @@
+"""Local development runner."""
+
 from app import create_app
 
 

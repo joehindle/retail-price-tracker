@@ -1,10 +1,14 @@
+"""Helpers that turn raw price rows into simple dashboard summaries."""
+
 def _pct_change(now_value, old_value):
+    """Return percentage change from the old value to the current value."""
     if isinstance(now_value, (int, float)) and isinstance(old_value, (int, float)) and old_value != 0:
         return ((now_value - old_value) / old_value) * 100.0
     return None
 
 
 def _find_row_by_name(rows, token):
+    """Find the first non-error row whose shop name contains the token."""
     token = token.lower()
     for row in rows:
         if row.get("error"):
@@ -15,6 +19,7 @@ def _find_row_by_name(rows, token):
 
 
 def build_cheaper_banner(rows):
+    """Summarize the price gap between the cheapest and most expensive shops."""
     priced_rows = [row for row in rows if isinstance(row.get("latest_price_num"), (int, float))]
     if len(priced_rows) < 2:
         return None
@@ -35,6 +40,7 @@ def build_cheaper_banner(rows):
 
 
 def build_terminal_metrics(rows, market_snapshot):
+    """Build the small metrics block printed to the terminal after compare."""
     currys_row = _find_row_by_name(rows, "currys")
     amazon_row = _find_row_by_name(rows, "amazon")
 
@@ -57,6 +63,7 @@ def build_terminal_metrics(rows, market_snapshot):
 
 
 def print_terminal_metrics(metrics):
+    """Print a compact metrics snapshot for quick terminal inspection."""
     print("# Today's prices", flush=True)
     print(f"currys_price_today = {metrics['currys_price_today']}", flush=True)
     print(f"amazon_price_today = {metrics['amazon_price_today']}", flush=True)

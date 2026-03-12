@@ -1,25 +1,27 @@
+"""Flask entrypoint for the retail price tracker dashboard."""
+
 from flask import Flask, render_template, request
 
 from services.comparison_service import build_cheaper_banner, build_terminal_metrics, print_terminal_metrics
 from services.price_service import (
     TIME_RANGE_CONFIG,
-    build_price_chart_data,
-    compare_shops,
     get_available_shops,
-    get_market_snapshot,
-    get_lowest_price_in_range,
+    prepare_comparison_view,
     get_product_preview,
 )
 
 
 TIME_RANGE_OPTIONS = [(key, cfg["label"]) for key, cfg in TIME_RANGE_CONFIG.items()]
+EMPTY_PRODUCT_PREVIEW = {"title": None, "image_url": None}
 
 
 def create_app():
+    """Create and configure the Flask app."""
     app = Flask(__name__)
 
     @app.route('/', methods=['GET', 'POST'])
     def index():
+        """Render the dashboard and handle product lookup/compare actions."""
         output = []
         chart_data = None
         cheaper_banner = None
@@ -27,7 +29,7 @@ def create_app():
         market_snapshot = None
         error = None
         shops = []
-        product_preview = {"title": None, "image_url": None}
+        product_preview = EMPTY_PRODUCT_PREVIEW.copy()
         selected_shop_ids = []
         form_values = {'product_id': '', 'time_range': '1m'}
 
@@ -45,13 +47,12 @@ def create_app():
 
                 product_id = int(form_values['product_id'])
                 range_key = form_values['time_range'] if form_values['time_range'] in TIME_RANGE_CONFIG else '1m'
-                api_time_range = TIME_RANGE_CONFIG[range_key]["api"]
                 form_values['time_range'] = range_key
 
                 try:
                     product_preview = get_product_preview(product_id)
                 except Exception:
-                    product_preview = {"title": None, "image_url": None}
+                    product_preview = EMPTY_PRODUCT_PREVIEW.copy()
 
                 shops = get_available_shops(product_id)
                 if action == 'load' and not shops:
@@ -69,19 +70,16 @@ def create_app():
                     if not selected_pairs:
                         error = 'Select at least one retailer before comparing.'
                     else:
-                        output = compare_shops(product_id, selected_pairs, time_range=api_time_range)
-                        chart_data = build_price_chart_data(product_id, selected_pairs, range_key=range_key)
-                        all_shop_pairs = [(shop["name"], int(shop["id"])) for shop in shops]
-                        lowest_range_price = get_lowest_price_in_range(
+                        comparison_view = prepare_comparison_view(
                             product_id,
-                            all_shop_pairs,
-                            time_range=api_time_range,
+                            selected_pairs,
+                            shops,
+                            range_key=range_key,
                         )
-                        market_snapshot = get_market_snapshot(
-                            product_id,
-                            all_shop_pairs,
-                            time_range=api_time_range,
-                        )
+                        output = comparison_view["output"]
+                        chart_data = comparison_view["chart_data"]
+                        lowest_range_price = comparison_view["lowest_range_price"]
+                        market_snapshot = comparison_view["market_snapshot"]
                         cheaper_banner = build_cheaper_banner(output)
                         terminal_metrics = build_terminal_metrics(output, market_snapshot)
                         print_terminal_metrics(terminal_metrics)

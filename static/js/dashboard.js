@@ -1,9 +1,11 @@
 (function () {
+  // The server injects a single payload the page can read without extra requests.
   const appData = window.dashboardData || {};
   const shops = Array.isArray(appData.shops) ? appData.shops : [];
   const chartData = appData.chartData || null;
 
   function initPriceChart() {
+    // Skip chart boot if the page has no chart data yet.
     const canvas = document.getElementById('price-history-chart');
     if (!canvas || !chartData || !Array.isArray(chartData.labels) || !Array.isArray(chartData.series)) {
       return;
@@ -62,6 +64,7 @@
   }
 
   function initRetailerControls() {
+    // These controls only exist after a product has been loaded.
     const retailerContainer = document.getElementById('retailer-container');
     const addBtn = document.getElementById('add-retailer-btn');
 
@@ -69,19 +72,23 @@
       return;
     }
 
+    // Build the option list once, then clone it for each added row.
+    const optionTemplate = document.createDocumentFragment();
+    shops.forEach((shop) => {
+      const option = document.createElement('option');
+      option.value = String(shop.id);
+      option.textContent = shop.name;
+      optionTemplate.appendChild(option);
+    });
+
     function createRetailerRow() {
+      // Each row is just a select plus a remove button.
       const row = document.createElement('div');
       row.className = 'retailer-row fade-item';
 
       const select = document.createElement('select');
       select.name = 'shop_ids';
-
-      shops.forEach((shop) => {
-        const option = document.createElement('option');
-        option.value = String(shop.id);
-        option.textContent = shop.name;
-        select.appendChild(option);
-      });
+      select.appendChild(optionTemplate.cloneNode(true));
 
       const removeBtn = document.createElement('button');
       removeBtn.type = 'button';
@@ -101,6 +108,7 @@
     }
 
     function removeRetailer(button) {
+      // Keep at least one retailer selector visible.
       if (retailerContainer.children.length <= 1) {
         return;
       }

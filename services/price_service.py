@@ -1,4 +1,7 @@
+"""PriceSpy data access and transformation helpers for the dashboard."""
+
 from datetime import UTC, datetime, timedelta
+from functools import lru_cache
 from html import unescape
 import re
 
@@ -59,15 +62,20 @@ TIME_RANGE_CONFIG = {
 }
 
 
+@lru_cache(maxsize=4096)
 def parse_dt(date_str):
+    """Parse an API timestamp into a timezone-aware datetime."""
+    # Cache repeated API timestamps so sorting/comparisons stay cheap.
     return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
 
 
 def format_display_date(date_str):
+    """Convert an API timestamp into the short UI format."""
     return parse_dt(date_str).strftime("%d %b %Y")
 
 
 def _clean_product_title(raw_title):
+    """Trim PriceSpy-specific prefixes and suffixes from scraped titles."""
     if not raw_title:
         return raw_title
 
@@ -76,6 +84,7 @@ def _clean_product_title(raw_title):
 
 
 def _extract_meta_content(page_html, attr_name, attr_value):
+    """Extract a `<meta>` tag content value by attribute/value pair."""
     escaped_name = re.escape(attr_name)
     escaped_value = re.escape(attr_value)
     patterns = [
@@ -91,6 +100,7 @@ def _extract_meta_content(page_html, attr_name, attr_value):
 
 
 def _extract_product_title_from_html(page_html):
+    """Fallback title extractor for the product page HTML."""
     match = re.search(
         r'<div[^>]*data-test=["\']ProductTitle["\'][^>]*>.*?<h1[^>]*>(.*?)</h1>',
         page_html,
@@ -107,6 +117,7 @@ def _extract_product_title_from_html(page_html):
 
 
 def get_product_preview(product_id):
+    """Fetch the product title and image used in the dashboard header."""
     page_html = fetch_product_page_html(product_id)
     image_url = (
         _extract_meta_content(page_html, "property", "og:image")
@@ -126,10 +137,12 @@ def get_product_preview(product_id):
 
 
 def get_available_shops(product_id):
+    """Return live retailers currently associated with the product."""
     return _get_listing_shops(product_id)
 
 
 def _collect_unique_shops_from_store_items(items):
+    """Deduplicate store items from GraphQL listing/offer payloads."""
     unique = {}
     for item in items or []:
         store = item.get("store") or {}
@@ -142,6 +155,7 @@ def _collect_unique_shops_from_store_items(items):
 
 
 def _get_listing_shops(product_id):
+    """Load the retailer list from GraphQL, then fall back to page parsing."""
     listing_queries = [
         (PRODUCT_LISTINGS_QUERY, "productListings", "listings"),
         (PRODUCT_OFFERS_QUERY, "productOffers", "offers"),
@@ -176,6 +190,7 @@ def _get_listing_shops(product_id):
 
 
 def _extract_stores_from_page_html(page_html):
+    """Parse store IDs and names from serialized page data as a fallback."""
     if not page_html:
         return []
 
@@ -198,6 +213,7 @@ def _extract_stores_from_page_html(page_html):
 
 
 def get_shop_history(product_id, shop_id, time_range="ThreeMonths"):
+    """Fetch price history for one retailer and one time range."""
     product = execute_bff_product_query(
         product_id=product_id,
         query=SHOP_HISTORY_QUERY,
@@ -212,6 +228,7 @@ def get_shop_history(product_id, shop_id, time_range="ThreeMonths"):
 
 
 def _normalize_shop_entries(shops):
+    """Normalize shop input into a stable list of `(name, id)` tuples."""
     shop_entries = shops.items() if isinstance(shops, dict) else shops
     normalized = []
     for shop_name, shop_id in shop_entries:
@@ -220,6 +237,7 @@ def _normalize_shop_entries(shops):
 
 
 def _fetch_shop_histories(product_id, shops, time_range):
+    """Batch-fetch shop histories for the supplied retailers."""
     normalized_entries = _normalize_shop_entries(shops)
     if not normalized_entries:
         return {}, []
@@ -235,11 +253,23 @@ def _fetch_shop_histories(product_id, shops, time_range):
     return shop_lookup, product.get("shopHistory") or []
 
 
-def get_lowest_price_in_range(product_id, shops, time_range="ThreeMonths"):
-    if not shops:
+def _histories_by_shop_id(shop_histories):
+    """Index a batched history response by shop ID for quick reuse."""
+    history_map = {}
+    for shop_history in shop_histories:
+        shop_id = shop_history.get("shopId")
+        if isinstance(shop_id, int):
+            history_map[shop_id] = (shop_history.get("productHistory") or {}).get("historyItems") or []
+    return history_map
+
+
+def get_lowest_price_in_range(product_id, shops, time_range="ThreeMonths", shop_histories=None, shop_lookup=None):
+    """Find the lowest recorded price across all supplied retailers."""
+    if not shops and shop_histories is None:
         return None
 
-    shop_lookup, shop_histories = _fetch_shop_histories(product_id, shops, time_range)
+    if shop_histories is None or shop_lookup is None:
+        shop_lookup, shop_histories = _fetch_shop_histories(product_id, shops, time_range)
     if not shop_histories:
         return None
 
@@ -263,11 +293,13 @@ def get_lowest_price_in_range(product_id, shops, time_range="ThreeMonths"):
     return lowest
 
 
-def get_market_snapshot(product_id, shops, time_range="ThreeMonths"):
-    if not shops:
+def get_market_snapshot(product_id, shops, time_range="ThreeMonths", shop_histories=None, shop_lookup=None):
+    """Summarize the current lowest active price and listing count."""
+    if not shops and shop_histories is None:
         return {"market_low": None, "market_low_shop": None, "offer_count": 0}
 
-    shop_lookup, shop_histories = _fetch_shop_histories(product_id, shops, time_range)
+    if shop_histories is None or shop_lookup is None:
+        shop_lookup, shop_histories = _fetch_shop_histories(product_id, shops, time_range)
     if not shop_histories:
         return {"market_low": None, "market_low_shop": None, "offer_count": 0}
 
@@ -306,10 +338,12 @@ def get_market_snapshot(product_id, shops, time_range="ThreeMonths"):
 
 
 def _normalize_range_key(range_key):
+    """Guard against invalid range keys coming from the request."""
     return range_key if range_key in TIME_RANGE_CONFIG else "1m"
 
 
 def _coerce_price(value):
+    """Turn API price values into floats when possible."""
     try:
         return float(value)
     except (TypeError, ValueError):
@@ -317,18 +351,21 @@ def _coerce_price(value):
 
 
 def _compute_change_pct(current_price, baseline_price):
+    """Calculate percentage change for the compare cards."""
     if isinstance(current_price, (int, float)) and isinstance(baseline_price, (int, float)) and baseline_price != 0:
         return ((current_price - baseline_price) / baseline_price) * 100.0
     return None
 
 
 def _window_dates(days):
+    """Return the inclusive chart window for the selected range."""
     end_date = datetime.now(UTC).date()
     start_date = end_date - timedelta(days=days - 1)
     return start_date, end_date
 
 
 def _with_parsed_dates(items):
+    """Attach parsed dates once so later scans stay simple."""
     parsed = []
     for item in items:
         parsed.append((parse_dt(item["date"]).date(), item))
@@ -337,6 +374,7 @@ def _with_parsed_dates(items):
 
 
 def _find_anchor_price(items_with_dates, start_date):
+    """Find the last price before the visible chart window starts."""
     anchor = None
     for item_day, item in items_with_dates:
         if item_day < start_date:
@@ -349,6 +387,7 @@ def _find_anchor_price(items_with_dates, start_date):
 
 
 def _build_daily_points(items_with_dates, start_date, end_date, anchor_price=None):
+    """Expand sparse price history into one value per day on the chart."""
     days = (end_date - start_date).days + 1
     date_axis = [start_date + timedelta(days=offset) for offset in range(days)]
     points = []
@@ -367,7 +406,14 @@ def _build_daily_points(items_with_dates, start_date, end_date, anchor_price=Non
     return labels, points
 
 
-def build_price_chart_data(product_id, selected_shops, range_key="1m"):
+def build_price_chart_data(
+    product_id,
+    selected_shops,
+    range_key="1m",
+    shop_histories=None,
+    anchor_histories=None,
+):
+    """Build chart labels and daily series for the selected retailers."""
     normalized_key = _normalize_range_key(range_key)
     cfg = TIME_RANGE_CONFIG[normalized_key]
     days = cfg["days"]
@@ -376,19 +422,31 @@ def build_price_chart_data(product_id, selected_shops, range_key="1m"):
 
     chart_series = []
     labels = []
-    shop_entries = selected_shops.items() if isinstance(selected_shops, dict) else selected_shops
+    normalized_entries = _normalize_shop_entries(selected_shops)
+    history_map = _histories_by_shop_id(shop_histories or [])
 
-    for shop_name, shop_id in shop_entries:
-        items = get_shop_history(product_id, shop_id, time_range=api_time_range)
+    if not history_map:
+        _, fetched_histories = _fetch_shop_histories(product_id, normalized_entries, api_time_range)
+        history_map = _histories_by_shop_id(fetched_histories)
+
+    anchor_history_map = {}
+    if normalized_key != "12m":
+        anchor_history_map = _histories_by_shop_id(anchor_histories or [])
+        if not anchor_history_map:
+            _, fetched_anchor_histories = _fetch_shop_histories(product_id, normalized_entries, "OneYear")
+            anchor_history_map = _histories_by_shop_id(fetched_anchor_histories)
+
+    for shop_name, shop_id in normalized_entries:
+        items = history_map.get(shop_id) or []
         if not items:
             continue
 
         items_with_dates = _with_parsed_dates(items)
 
-        # Pull deeper history to seed the line from the last known price before the window.
+        # Seed the graph with the last known price before the visible window.
         anchor_price = None
         if normalized_key != "12m":
-            anchor_items = get_shop_history(product_id, shop_id, time_range="OneYear")
+            anchor_items = anchor_history_map.get(shop_id) or []
             anchor_price = _find_anchor_price(_with_parsed_dates(anchor_items), start_date)
 
         labels, points = _build_daily_points(items_with_dates, start_date, end_date, anchor_price=anchor_price)
@@ -403,26 +461,38 @@ def build_price_chart_data(product_id, selected_shops, range_key="1m"):
 
 
 def get_latest_and_30d_price(items):
+    """Return the latest item and the closest item from 30 days earlier."""
     if not items:
         return None, None
 
-    sorted_items = sorted(items, key=lambda x: parse_dt(x["date"]))
-    latest_item = sorted_items[-1]
-    latest_dt = parse_dt(latest_item["date"])
+    parsed_items = sorted(
+        ((parse_dt(item["date"]), item) for item in items),
+        key=lambda entry: entry[0],
+    )
+    latest_dt, latest_item = parsed_items[-1]
 
     target_dt = latest_dt - timedelta(days=30)
-    on_or_before_30d = [item for item in sorted_items if parse_dt(item["date"]) <= target_dt]
-
-    item_30d = on_or_before_30d[-1] if on_or_before_30d else sorted_items[0]
+    item_30d = parsed_items[0][1]
+    # Walk backward once to find the closest point on or before the baseline date.
+    for item_dt, item in reversed(parsed_items):
+        if item_dt <= target_dt:
+            item_30d = item
+            break
     return latest_item, item_30d
 
 
-def compare_shops(product_id, selected_shops, time_range="ThreeMonths"):
+def compare_shops(product_id, selected_shops, time_range="ThreeMonths", shop_histories=None):
+    """Build the per-shop result cards shown in the dashboard."""
     results = []
-    shop_entries = selected_shops.items() if isinstance(selected_shops, dict) else selected_shops
+    normalized_entries = _normalize_shop_entries(selected_shops)
+    history_map = _histories_by_shop_id(shop_histories or [])
 
-    for shop_name, shop_id in shop_entries:
-        items = get_shop_history(product_id, shop_id, time_range=time_range)
+    if not history_map:
+        _, fetched_histories = _fetch_shop_histories(product_id, normalized_entries, time_range)
+        history_map = _histories_by_shop_id(fetched_histories)
+
+    for shop_name, shop_id in normalized_entries:
+        items = history_map.get(shop_id) or []
         if not items:
             results.append({"shop_name": shop_name, "error": "No history found"})
             continue
@@ -459,3 +529,52 @@ def compare_shops(product_id, selected_shops, time_range="ThreeMonths"):
         )
 
     return results
+
+
+def prepare_comparison_view(product_id, selected_shops, all_shops, range_key="1m"):
+    """Build all data needed by the compare view in one place."""
+    normalized_key = _normalize_range_key(range_key)
+    api_time_range = TIME_RANGE_CONFIG[normalized_key]["api"]
+    selected_entries = _normalize_shop_entries(selected_shops)
+    all_entries = [(shop["name"], int(shop["id"])) for shop in all_shops]
+
+    # Fetch selected retailer history once and reuse it for cards and chart.
+    _, selected_histories = _fetch_shop_histories(product_id, selected_entries, api_time_range)
+    _, selected_anchor_histories = _fetch_shop_histories(
+        product_id,
+        selected_entries,
+        "OneYear",
+    ) if normalized_key != "12m" else ({}, [])
+
+    # Fetch the full market set once for the global summary banners.
+    all_lookup, all_histories = _fetch_shop_histories(product_id, all_entries, api_time_range)
+
+    return {
+        "output": compare_shops(
+            product_id,
+            selected_entries,
+            time_range=api_time_range,
+            shop_histories=selected_histories,
+        ),
+        "chart_data": build_price_chart_data(
+            product_id,
+            selected_entries,
+            range_key=normalized_key,
+            shop_histories=selected_histories,
+            anchor_histories=selected_anchor_histories,
+        ),
+        "lowest_range_price": get_lowest_price_in_range(
+            product_id,
+            all_entries,
+            time_range=api_time_range,
+            shop_histories=all_histories,
+            shop_lookup=all_lookup,
+        ),
+        "market_snapshot": get_market_snapshot(
+            product_id,
+            all_entries,
+            time_range=api_time_range,
+            shop_histories=all_histories,
+            shop_lookup=all_lookup,
+        ),
+    }
