@@ -10,7 +10,19 @@
   <header class="admin-topbar">
     <div class="topbar-inner">
       <div class="app-title">Retail Price Tracker</div>
-      <div class="topbar-meta">Admin Dashboard</div>
+      <div class="topbar-meta">
+        <a class="topbar-link" href="#">
+          Alerts
+          <span class="alert-badge">3</span>
+        </a>
+        <div class="topbar-user">
+          <div class="topbar-user-copy">
+            <div class="topbar-user-name">Joe Hindle</div>
+            <div class="topbar-user-role">Pricing Analyst</div>
+          </div>
+          <div class="topbar-avatar" aria-hidden="true">JH</div>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -18,7 +30,8 @@
     <!-- Intro and controls live on the left; results render on the right. -->
     <section class="page-intro">
       <h1>Price Monitoring</h1>
-      <p>Load a product, choose retailers, and compare latest price vs 30-day baseline.</p>
+      <p>Compare selected retailer prices over time and generate Currys-focused pricing recommendations.</p>
+      <div class="page-meta">Last updated: {{ last_updated_label }}</div>
     </section>
 
     <section class="dashboard" aria-label="Price tracker dashboard">
@@ -26,10 +39,16 @@
         <section class="dashboard-panel controls-panel stack">
           <h2>Controls</h2>
           <form method="post" class="stack">
+            <input type="hidden" name="loaded_product_id" value="{{ form_values.loaded_product_id }}">
             <!-- Product lookup fields -->
             <div>
-              <label for="product_id">Product ID</label>
-              <input id="product_id" name="product_id" value="{{ form_values.product_id }}" placeholder="e.g. 11920424" required>
+              <label for="product_id">Product</label>
+              <select id="product_id" name="product_id" required>
+                <option value="" disabled {% if not form_values.product_id %}selected{% endif %}>Select a demo product</option>
+                {% for product in demo_products %}
+                  <option value="{{ product.id }}" {% if form_values.product_id == product.id %}selected{% endif %}>{{ product.label }}</option>
+                {% endfor %}
+              </select>
             </div>
 
             <div>
@@ -53,7 +72,28 @@
               {% endif %}
               <div>
                 <div class="kicker">Loaded Product</div>
-                <div class="product-title">{{ product_preview.title or ('Product ID ' ~ form_values.product_id if form_values.product_id else 'No product loaded') }}</div>
+                <div class="product-title">{{ product_preview.title or ('Selected demo product' if form_values.product_id else 'No product loaded') }}</div>
+              </div>
+            </section>
+
+            <section class="watchlist-panel">
+              <div class="watchlist-head">
+                <div>
+                  <div class="kicker">Workspace</div>
+                  <h3>Watchlist</h3>
+                </div>
+                <span class="watchlist-count">{{ watchlist_items|length }}</span>
+              </div>
+              <div class="watchlist-list">
+                {% for item in watchlist_items %}
+                  <article class="watchlist-item {% if form_values.product_id == item.id %}watchlist-item-active{% endif %}">
+                    <div class="watchlist-row">
+                      <div class="watchlist-name">{{ item.name }}</div>
+                      <span class="watchlist-trend watchlist-trend-{{ item.tone }}">{{ item.status }}</span>
+                    </div>
+                    <div class="watchlist-meta">{{ item.meta }}</div>
+                  </article>
+                {% endfor %}
               </div>
             </section>
 
@@ -91,25 +131,49 @@
 
         <section class="dashboard-panel results-panel">
           <h2>Comparison Results</h2>
-          <!-- Summary banners call out the main pricing signals first. -->
-          {% if cheaper_banner %}
-            <div class="cheaper-banner">
-              {{ cheaper_banner.cheaper_name }} is currently &pound;{{ "%.2f"|format(cheaper_banner.gap) }} ({{ "%.1f"|format(cheaper_banner.gap_pct) }}%) cheaper than {{ cheaper_banner.expensive_name }}.
-            </div>
-          {% endif %}
-          {% if market_snapshot and market_snapshot.market_low is not none %}
-            <div class="current-low-banner">
-              Current lowest price right now: &pound;{{ "%.2f"|format(market_snapshot.market_low) }}
-              {% if market_snapshot.market_low_shop %}at {{ market_snapshot.market_low_shop }}{% endif %}
-              {% if market_snapshot.offer_count is not none %}({{ market_snapshot.offer_count }} active listings){% endif %}.
-            </div>
-          {% endif %}
-          {% if lowest_range_price and chart_data %}
-            <div class="range-low-banner">
-              Lowest recorded price in {{ chart_data.range_label }}: &pound;{{ "%.2f"|format(lowest_range_price.price) }}
-              {% if lowest_range_price.shop_name %}at {{ lowest_range_price.shop_name }}{% endif %}
-              {% if lowest_range_price.date_display %}on {{ lowest_range_price.date_display }}{% endif %}.
-            </div>
+          <!-- The summary block keeps the key facts visible without using three tall banners. -->
+          {% if cheaper_banner or (market_snapshot and market_snapshot.market_low is not none) or (lowest_range_price and chart_data) %}
+            <section class="summary-panel" aria-labelledby="summary-title">
+              <div class="summary-head">
+                <div>
+                  <div class="kicker">Summary</div>
+                  <h3 id="summary-title">Market Snapshot</h3>
+                </div>
+              </div>
+              <div class="summary-grid">
+                {% if cheaper_banner %}
+                  <article class="summary-item summary-item-success">
+                    <div class="summary-label">Cheapest Now</div>
+                    <div class="summary-value">{{ cheaper_banner.cheaper_name }}</div>
+                    <div class="summary-detail">
+                      &pound;{{ "%.2f"|format(cheaper_banner.gap) }} cheaper than {{ cheaper_banner.expensive_name }}
+                      ({{ "%.1f"|format(cheaper_banner.gap_pct) }}%)
+                    </div>
+                  </article>
+                {% endif %}
+                {% if market_snapshot and market_snapshot.market_low is not none %}
+                  <article class="summary-item summary-item-info">
+                    <div class="summary-label">Current Market Low</div>
+                    <div class="summary-value">&pound;{{ "%.2f"|format(market_snapshot.market_low) }}</div>
+                    <div class="summary-detail">
+                      {% if market_snapshot.market_low_shop %}{{ market_snapshot.market_low_shop }}{% endif %}
+                      {% if market_snapshot.offer_count is not none %} &middot; {{ market_snapshot.offer_count }} active listings{% endif %}
+                    </div>
+                  </article>
+                {% endif %}
+                {% if lowest_range_price and chart_data %}
+                  <article class="summary-item summary-item-range">
+                    <div class="summary-label">Range Low</div>
+                    <div class="summary-value">&pound;{{ "%.2f"|format(lowest_range_price.price) }}</div>
+                    <div class="summary-detail">
+                      {{ chart_data.range_label }}
+                      {% if lowest_range_price.shop_name %} &middot; {{ lowest_range_price.shop_name }}{% endif %}
+                      {% if lowest_range_price.date_display %} &middot; {{ lowest_range_price.date_display }}{% endif %}
+                    </div>
+                  </article>
+                {% endif %}
+              </div>
+            </section>
           {% endif %}
           {% if chart_data and chart_data.series %}
             <!-- The chart uses server-built daily points for each selected shop. -->
@@ -120,6 +184,34 @@
               </div>
               <div class="chart-wrap">
                 <canvas id="price-history-chart" aria-label="Price comparison line chart"></canvas>
+              </div>
+            </section>
+          {% endif %}
+          {% if output %}
+            <!-- AI feedback sits directly under the chart so users can read both together. -->
+            <section class="ai-panel" aria-labelledby="ai-insights-title">
+              <div class="ai-panel-head">
+                <div>
+                  <div class="kicker">Assistant</div>
+                  <div class="ai-title-row">
+                    <h3 id="ai-insights-title">AI Insights</h3>
+                    <span class="recommendation-pill recommendation-pill-promote">Promote</span>
+                  </div>
+                </div>
+                <button class="btn-ai" type="button" id="generate-ai-feedback-btn">
+                  Generate AI Feedback
+                </button>
+              </div>
+              <p class="ai-panel-copy">
+                Ask the assistant to explain the latest movement, the lowest point in range, and which retailers stand out.
+              </p>
+              <div class="ai-thread" id="ai-thread">
+                <article class="ai-message ai-message-system" id="ai-empty-state">
+                  <div class="ai-avatar">AI</div>
+                  <div class="ai-bubble">
+                    No AI feedback yet. Generate insights for the current comparison.
+                  </div>
+                </article>
               </div>
             </section>
           {% endif %}
@@ -160,7 +252,14 @@
   </main>
 
   <script>
-    window.dashboardData = {{ {'shops': shops, 'chartData': chart_data}|tojson }};
+    window.dashboardData = {{ {
+      'shops': shops,
+      'chartData': chart_data,
+      'output': output,
+      'marketSnapshot': market_snapshot,
+      'lowestRangePrice': lowest_range_price,
+      'productTitle': product_preview.title
+    }|tojson }};
   </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>

@@ -1,5 +1,9 @@
 """HTTP helpers for the PriceSpy product page and internal BFF API."""
 
+from __future__ import annotations
+
+from typing import Any
+
 import requests
 
 
@@ -8,7 +12,7 @@ PRODUCT_PAGE_URL = "https://pricespy.co.uk/product.php?p={product_id}"
 SESSION = requests.Session()
 
 
-def _browser_user_agent():
+def _browser_user_agent() -> str:
     """Mimic a normal browser so the upstream service accepts the request."""
     return (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -17,7 +21,7 @@ def _browser_user_agent():
     )
 
 
-def _bff_headers(product_id):
+def _bff_headers(product_id: int) -> dict[str, str]:
     """Build headers expected by the BFF endpoint."""
     return {
         "accept": "*/*",
@@ -28,7 +32,7 @@ def _bff_headers(product_id):
     }
 
 
-def fetch_product_page_html(product_id):
+def fetch_product_page_html(product_id: int) -> str:
     """Fetch the public product page HTML used for preview/fallback parsing."""
     headers = {
         "accept": "text/html,application/xhtml+xml",
@@ -40,7 +44,12 @@ def fetch_product_page_html(product_id):
     return res.text
 
 
-def execute_bff_product_query(product_id, query, variables, operation_name):
+def execute_bff_product_query(
+    product_id: int,
+    query: str,
+    variables: dict[str, Any],
+    operation_name: str,
+) -> dict[str, Any]:
     """Execute a GraphQL query against the internal product endpoint."""
     payload = {
         "query": query,
@@ -53,6 +62,6 @@ def execute_bff_product_query(product_id, query, variables, operation_name):
     body = res.json()
 
     if "errors" in body:
-        raise Exception(f"GraphQL errors: {body['errors']}")
+        raise RuntimeError(f"GraphQL errors: {body['errors']}")
 
     return body["data"]["product"]

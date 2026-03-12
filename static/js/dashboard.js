@@ -3,6 +3,10 @@
   const appData = window.dashboardData || {};
   const shops = Array.isArray(appData.shops) ? appData.shops : [];
   const chartData = appData.chartData || null;
+  const outputRows = Array.isArray(appData.output) ? appData.output : [];
+  const marketSnapshot = appData.marketSnapshot || null;
+  const lowestRangePrice = appData.lowestRangePrice || null;
+  const productTitle = appData.productTitle || null;
 
   function initPriceChart() {
     // Skip chart boot if the page has no chart data yet.
@@ -129,6 +133,74 @@
     window.removeRetailer = removeRetailer;
   }
 
+  function initAiPreview() {
+    const trigger = document.getElementById('generate-ai-feedback-btn');
+    const thread = document.getElementById('ai-thread');
+
+    if (!trigger || !thread) {
+      return;
+    }
+
+    function renderThreadMessage(text, isError = false) {
+      const message = document.createElement('article');
+      const avatar = document.createElement('div');
+      const bubble = document.createElement('div');
+
+      message.className = isError ? 'ai-message ai-message-system' : 'ai-message ai-message-assistant';
+      avatar.className = 'ai-avatar';
+      avatar.textContent = 'AI';
+      bubble.className = 'ai-bubble';
+      bubble.textContent = text;
+
+      message.appendChild(avatar);
+      message.appendChild(bubble);
+
+      thread.replaceChildren(message);
+    }
+
+    trigger.addEventListener('click', async () => {
+      if (outputRows.length === 0) {
+        renderThreadMessage('Run a comparison first, then generate AI feedback.', true);
+        return;
+      }
+
+      trigger.disabled = true;
+      const originalLabel = trigger.textContent;
+      trigger.textContent = 'Generating...';
+      renderThreadMessage('Generating insights...', false);
+
+      try {
+        const response = await fetch('/api/ai-feedback', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            output: outputRows,
+            chartData,
+            marketSnapshot,
+            lowestRangePrice,
+            productTitle,
+          }),
+        });
+
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(body.error || 'Failed to generate AI feedback.');
+        }
+
+        const feedback = body.feedback || 'No AI feedback returned.';
+        renderThreadMessage(feedback, false);
+      } catch (error) {
+        renderThreadMessage(error.message || 'Failed to generate AI feedback.', true);
+      } finally {
+        trigger.disabled = false;
+        trigger.textContent = originalLabel;
+      }
+    });
+  }
+
   initPriceChart();
   initRetailerControls();
+  initAiPreview();
 })();
