@@ -30,7 +30,11 @@ Built to be demo-ready for:
 3. Pick a demo product from the dropdown:
    - `11920424` (Garmin Venu 3)
    - `6219512` (Sony WH-1000XM5)
-   - `13549231` (Beats Solo 4)
+   - `13549231` (Beats Solo 4 Wireless On-ear Headphones)
+   - `4056108` (Sage Appliances The Barista Express with Control Milk Jug)
+   - `12794048` (AOC Q27G3XMN 27" Gaming QHD VA 180Hz)
+   - `13088640` (JBL PartyBox Club 120 Bluetooth Speaker)
+   - `4718189` (Bosch AdvancedAquatak 140)
 4. Click `Load Retailers`.
 5. Add/remove retailers and click `Compare`.
 6. Review:

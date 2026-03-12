@@ -23,6 +23,10 @@ DEMO_PRODUCTS = [
     {"id": "11920424", "label": "Garmin Venu 3"},
     {"id": "6219512", "label": "Sony WH-1000XM5"},
     {"id": "13549231", "label": "Beats Solo 4 Wireless On-ear Headphones"},
+    {"id": "4056108", "label": "Sage Appliances The Barista Express with Control Milk Jug"},
+    {"id": "12794048", "label": 'AOC Q27G3XMN 27" Gaming QHD VA 180Hz'},
+    {"id": "13088640", "label": "JBL PartyBox Club 120 Bluetooth Speaker"},
+    {"id": "4718189", "label": "Bosch AdvancedAquatak 140"},
 ]
 DEMO_WATCHLIST = [
     {
