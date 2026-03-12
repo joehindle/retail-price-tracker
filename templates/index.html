@@ -91,25 +91,49 @@
 
         <section class="dashboard-panel results-panel">
           <h2>Comparison Results</h2>
-          <!-- Summary banners call out the main pricing signals first. -->
-          {% if cheaper_banner %}
-            <div class="cheaper-banner">
-              {{ cheaper_banner.cheaper_name }} is currently &pound;{{ "%.2f"|format(cheaper_banner.gap) }} ({{ "%.1f"|format(cheaper_banner.gap_pct) }}%) cheaper than {{ cheaper_banner.expensive_name }}.
-            </div>
-          {% endif %}
-          {% if market_snapshot and market_snapshot.market_low is not none %}
-            <div class="current-low-banner">
-              Current lowest price right now: &pound;{{ "%.2f"|format(market_snapshot.market_low) }}
-              {% if market_snapshot.market_low_shop %}at {{ market_snapshot.market_low_shop }}{% endif %}
-              {% if market_snapshot.offer_count is not none %}({{ market_snapshot.offer_count }} active listings){% endif %}.
-            </div>
-          {% endif %}
-          {% if lowest_range_price and chart_data %}
-            <div class="range-low-banner">
-              Lowest recorded price in {{ chart_data.range_label }}: &pound;{{ "%.2f"|format(lowest_range_price.price) }}
-              {% if lowest_range_price.shop_name %}at {{ lowest_range_price.shop_name }}{% endif %}
-              {% if lowest_range_price.date_display %}on {{ lowest_range_price.date_display }}{% endif %}.
-            </div>
+          <!-- The summary block keeps the key facts visible without using three tall banners. -->
+          {% if cheaper_banner or (market_snapshot and market_snapshot.market_low is not none) or (lowest_range_price and chart_data) %}
+            <section class="summary-panel" aria-labelledby="summary-title">
+              <div class="summary-head">
+                <div>
+                  <div class="kicker">Summary</div>
+                  <h3 id="summary-title">Market Snapshot</h3>
+                </div>
+              </div>
+              <div class="summary-grid">
+                {% if cheaper_banner %}
+                  <article class="summary-item summary-item-success">
+                    <div class="summary-label">Cheapest Now</div>
+                    <div class="summary-value">{{ cheaper_banner.cheaper_name }}</div>
+                    <div class="summary-detail">
+                      &pound;{{ "%.2f"|format(cheaper_banner.gap) }} cheaper than {{ cheaper_banner.expensive_name }}
+                      ({{ "%.1f"|format(cheaper_banner.gap_pct) }}%)
+                    </div>
+                  </article>
+                {% endif %}
+                {% if market_snapshot and market_snapshot.market_low is not none %}
+                  <article class="summary-item summary-item-info">
+                    <div class="summary-label">Current Market Low</div>
+                    <div class="summary-value">&pound;{{ "%.2f"|format(market_snapshot.market_low) }}</div>
+                    <div class="summary-detail">
+                      {% if market_snapshot.market_low_shop %}{{ market_snapshot.market_low_shop }}{% endif %}
+                      {% if market_snapshot.offer_count is not none %} · {{ market_snapshot.offer_count }} active listings{% endif %}
+                    </div>
+                  </article>
+                {% endif %}
+                {% if lowest_range_price and chart_data %}
+                  <article class="summary-item summary-item-range">
+                    <div class="summary-label">Range Low</div>
+                    <div class="summary-value">&pound;{{ "%.2f"|format(lowest_range_price.price) }}</div>
+                    <div class="summary-detail">
+                      {{ chart_data.range_label }}
+                      {% if lowest_range_price.shop_name %} · {{ lowest_range_price.shop_name }}{% endif %}
+                      {% if lowest_range_price.date_display %} · {{ lowest_range_price.date_display }}{% endif %}
+                    </div>
+                  </article>
+                {% endif %}
+              </div>
+            </section>
           {% endif %}
           {% if chart_data and chart_data.series %}
             <!-- The chart uses server-built daily points for each selected shop. -->
