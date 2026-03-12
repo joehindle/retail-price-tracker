@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Retail Price Tracker Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body>
+  <header class="admin-topbar">
+    <div class="topbar-inner">
+      <div class="app-title">Retail Price Tracker</div>
+      <div class="topbar-meta">
+        <a class="topbar-link" href="#">
+          Alerts
+          <span class="alert-badge">3</span>
+        </a>
+        <div class="topbar-user">
+          <div class="topbar-user-copy">
+            <div class="topbar-user-name">Joe Hindle</div>
+            <div class="topbar-user-role">Pricing Analyst</div>
+          </div>
+          <div class="topbar-avatar" aria-hidden="true">JH</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-main">
+    <!-- Intro and controls live on the left; results render on the right. -->
+    <section class="page-intro">
+      <h1>Price Monitoring</h1>
+      <p>Compare selected retailer prices over time and generate Currys-focused pricing recommendations.</p>
+      <div class="page-meta">Last updated: {{ last_updated_label }}</div>
+    </section>
+
+    <section class="dashboard" aria-label="Price tracker dashboard">
+      <div class="dashboard-grid">
+        <section class="dashboard-panel controls-panel stack">
+          <h2>Controls</h2>
+          <form method="post" class="stack">
+            <input type="hidden" name="loaded_product_id" value="{{ form_values.loaded_product_id }}">
+            <!-- Product lookup fields -->
+            <div>
+              <label for="product_id">Product</label>
+              <select id="product_id" name="product_id" required>
+                <option value="" disabled {% if not form_values.product_id %}selected{% endif %}>Select a demo product</option>
+                {% for product in demo_products %}
+                  <option value="{{ product.id }}" {% if form_values.product_id == product.id %}selected{% endif %}>{{ product.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div>
+              <label for="time_range">Graph Range</label>
+              <select id="time_range" name="time_range">
+                {% for key, label in time_range_options %}
+                  <option value="{{ key }}" {% if form_values.time_range == key %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="toolbar">
+              <button type="submit" name="action" value="load">Load Retailers</button>
+            </div>
+
+            <section class="product-preview fade-item">
+              {% if product_preview.image_url %}
+                <img src="{{ product_preview.image_url }}" alt="{{ product_preview.title or 'Product image' }}" loading="lazy">
+              {% else %}
+                <div class="product-image-placeholder" aria-hidden="true"></div>
+              {% endif %}
+              <div>
+                <div class="kicker">Loaded Product</div>
+                <div class="product-title">{{ product_preview.title or ('Selected demo product' if form_values.product_id else 'No product loaded') }}</div>
+              </div>
+            </section>
+
+            <section class="watchlist-panel">
+              <div class="watchlist-head">
+                <div>
+                  <div class="kicker">Workspace</div>
+                  <h3>Watchlist</h3>
+                </div>
+                <span class="watchlist-count">{{ watchlist_items|length }}</span>
+              </div>
+              <div class="watchlist-list">
+                {% for item in watchlist_items %}
+                  <article class="watchlist-item {% if form_values.product_id == item.id %}watchlist-item-active{% endif %}">
+                    <div class="watchlist-row">
+                      <div class="watchlist-name">{{ item.name }}</div>
+                      <span class="watchlist-trend watchlist-trend-{{ item.tone }}">{{ item.status }}</span>
+                    </div>
+                    <div class="watchlist-meta">{{ item.meta }}</div>
+                  </article>
+                {% endfor %}
+              </div>
+            </section>
+
+            {% if shops %}
+              <!-- Retailer selectors appear only after a product loads successfully. -->
+              <section class="retailers stack">
+                <div>
+                  <label>Retailers To Compare</label>
+                  <div id="retailer-container">
+                    {% for selected_id in selected_shop_ids %}
+                      <div class="retailer-row fade-item" style="--item-index: {{ loop.index0 }};">
+                        <select name="shop_ids">
+                          {% for shop in shops %}
+                            <option value="{{ shop.id }}" {% if selected_id == (shop.id|string) %}selected{% endif %}>{{ shop.name }}</option>
+                          {% endfor %}
+                        </select>
+                        <button class="remove-btn" type="button" onclick="removeRetailer(this)" aria-label="Remove retailer">x</button>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+
+                <div class="toolbar">
+                  <button class="btn-alt" type="button" id="add-retailer-btn">+ Add Retailer</button>
+                  <button class="btn-compare" type="submit" name="action" value="compare">Compare</button>
+                </div>
+              </section>
+            {% endif %}
+
+            {% if error %}
+              <div class="error">{{ error }}</div>
+            {% endif %}
+          </form>
+        </section>
+
+        <section class="dashboard-panel results-panel">
+          <h2>Comparison Results</h2>
+          <!-- The summary block keeps the key facts visible without using three tall banners. -->
+          {% if cheaper_banner or (market_snapshot and market_snapshot.market_low is not none) or (lowest_range_price and chart_data) %}
+            <section class="summary-panel" aria-labelledby="summary-title">
+              <div class="summary-head">
+                <div>
+                  <div class="kicker">Summary</div>
+                  <h3 id="summary-title">Market Snapshot</h3>
+                </div>
+              </div>
+              <div class="summary-grid">
+                {% if cheaper_banner %}
+                  <article class="summary-item summary-item-success">
+                    <div class="summary-label">Cheapest Now</div>
+                    <div class="summary-value">{{ cheaper_banner.cheaper_name }}</div>
+                    <div class="summary-detail">
+                      &pound;{{ "%.2f"|format(cheaper_banner.gap) }} cheaper than {{ cheaper_banner.expensive_name }}
+                      ({{ "%.1f"|format(cheaper_banner.gap_pct) }}%)
+                    </div>
+                  </article>
+                {% endif %}
+                {% if market_snapshot and market_snapshot.market_low is not none %}
+                  <article class="summary-item summary-item-info">
+                    <div class="summary-label">Current Market Low</div>
+                    <div class="summary-value">&pound;{{ "%.2f"|format(market_snapshot.market_low) }}</div>
+                    <div class="summary-detail">
+                      {% if market_snapshot.market_low_shop %}{{ market_snapshot.market_low_shop }}{% endif %}
+                      {% if market_snapshot.offer_count is not none %} &middot; {{ market_snapshot.offer_count }} active listings{% endif %}
+                    </div>
+                  </article>
+                {% endif %}
+                {% if lowest_range_price and chart_data %}
+                  <article class="summary-item summary-item-range">
+                    <div class="summary-label">Range Low</div>
+                    <div class="summary-value">&pound;{{ "%.2f"|format(lowest_range_price.price) }}</div>
+                    <div class="summary-detail">
+                      {{ chart_data.range_label }}
+                      {% if lowest_range_price.shop_name %} &middot; {{ lowest_range_price.shop_name }}{% endif %}
+                      {% if lowest_range_price.date_display %} &middot; {{ lowest_range_price.date_display }}{% endif %}
+                    </div>
+                  </article>
+                {% endif %}
+              </div>
+            </section>
+          {% endif %}
+          {% if chart_data and chart_data.series %}
+            <!-- The chart uses server-built daily points for each selected shop. -->
+            <section class="chart-panel">
+              <div class="chart-head">
+                <strong>Price Trend</strong>
+                <span>{{ chart_data.range_label }}</span>
+              </div>
+              <div class="chart-wrap">
+                <canvas id="price-history-chart" aria-label="Price comparison line chart"></canvas>
+              </div>
+            </section>
+          {% endif %}
+          {% if output %}
+            <!-- AI feedback sits directly under the chart so users can read both together. -->
+            <section class="ai-panel" aria-labelledby="ai-insights-title">
+              <div class="ai-panel-head">
+                <div>
+                  <div class="kicker">Assistant</div>
+                  <div class="ai-title-row">
+                    <h3 id="ai-insights-title">AI Insights</h3>
+                    <span class="recommendation-pill recommendation-pill-promote">Promote</span>
+                  </div>
+                </div>
+                <button class="btn-ai" type="button" id="generate-ai-feedback-btn">
+                  Generate AI Feedback
+                </button>
+              </div>
+              <p class="ai-panel-copy">
+                Ask the assistant to explain the latest movement, the lowest point in range, and which retailers stand out.
+              </p>
+              <div class="ai-thread" id="ai-thread">
+                <article class="ai-message ai-message-system" id="ai-empty-state">
+                  <div class="ai-avatar">AI</div>
+                  <div class="ai-bubble">
+                    No AI feedback yet. Generate insights for the current comparison.
+                  </div>
+                </article>
+              </div>
+            </section>
+          {% endif %}
+          {% if output %}
+            <!-- Each card shows the latest price and the chosen baseline comparison. -->
+            <div class="results-grid">
+              {% for row in output %}
+                <article class="result-item" style="--item-index: {{ loop.index0 }};">
+                  <h3>{{ row.shop_name }}</h3>
+                  {% if row.error %}
+                    <div class="error">{{ row.error }}</div>
+                  {% else %}
+                    <div class="kicker">Today / Latest</div>
+                    <div class="value">GBP {{ row.latest_price }}<br><small>{{ row.latest_date_display }}</small></div>
+                    {% if row.change_pct is not none %}
+                      <div class="change-indicator change-{{ row.change_direction }}">
+                        {% if row.change_direction == 'down' %}
+                          &darr; {{ (row.change_pct|abs)|round(1) }}% vs 30 days ago
+                        {% elif row.change_direction == 'up' %}
+                          &uarr; {{ row.change_pct|round(1) }}% vs 30 days ago
+                        {% else %}
+                          &rarr; 0.0% vs 30 days ago
+                        {% endif %}
+                      </div>
+                    {% endif %}
+                    <div class="kicker">30 Days Ago</div>
+                    <div class="value">GBP {{ row.price_30d }}<br><small>{{ row.date_30d_display }}</small></div>
+                  {% endif %}
+                </article>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="placeholder">No comparison yet. Load retailers and run compare.</div>
+          {% endif %}
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    window.dashboardData = {{ {
+      'shops': shops,
+      'chartData': chart_data,
+      'output': output,
+      'marketSnapshot': market_snapshot,
+      'lowestRangePrice': lowest_range_price,
+      'productTitle': product_preview.title
+    }|tojson }};
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>
